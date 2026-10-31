@@ -1,25 +1,38 @@
 # 🚀 Hướng Dẫn Đóng Gói & Deploy Máy Chủ (Git & Docker)
 
-Tài liệu này hướng dẫn chi tiết từng bước để đẩy mã nguồn dự án **Hũ Tài Lộc (Shopee Cashback Affiliate)** lên Git và triển khai tự động bằng Docker & Docker Compose trên máy chủ VPS cho subdomain **`shoppe.khoahocdrivemh.pro.vn`**.
+Tài liệu này hướng dẫn chi tiết từng bước để đẩy mã nguồn dự án **Hũ Tài Lộc (Shopee Cashback Affiliate)** lên Git và triển khai tự động bằng Docker & Docker Compose trên máy chủ VPS cho subdomain **`thanhle.hutailoc.shop`**.
 
 ---
 
 ## 🛠️ Kiến Trúc Hệ Thống Trong Docker (3 Service)
 
 Dự án đã được đóng gói thành **3 Container Docker** kết nối qua mạng nội bộ:
-1. **Database Container (`hoantien_mysql`)**: Chạy cơ sở dữ liệu **MySQL 8.0** độc lập. Toàn bộ dữ liệu tài khoản, đơn hàng và số dư được lưu trữ bền vững vào Docker Volume (`mysql_data`).
-2. **Backend Container (`hoantien_backend`)**: Chạy Node.js API (Cổng `5000`), kết nối trực tiếp với MySQL Container (`db:3306`) thông qua cơ chế `service_healthy`.
-3. **Frontend Container (`hoantien_frontend`)**: Chạy React Nginx Web Server (Cổng `80`), phục vụ subdomain **`shoppe.khoahocdrivemh.pro.vn`** và Reverse Proxy tất cả yêu cầu `/api/` về Backend.
+1. **Database Container (`hoantien_mysql`)**: Chạy cơ sở dữ liệu **MariaDB 10.11 / MySQL 8.0** độc lập. Toàn bộ dữ liệu tài khoản, đơn hàng và số dư được lưu trữ bền vững vào Docker Volume (`mysql_data`).
+2. **Backend Container (`hoantien_backend`)**: Chạy Node.js API (Cổng `5000`), kết nối trực tiếp với Database Container (`db:3306`).
+3. **Frontend Container (`hoantien_frontend`)**: Chạy React Nginx Web Server (Cổng `8080:80`), phục vụ subdomain **`thanhle.hutailoc.shop`** và Reverse Proxy tất cả yêu cầu `/api/` về Backend.
+
+---
+
+## 🌐 BƯỚC 0: Cấu Hình DNS Tên Miền (Trỏ Subdomain Về VPS)
+
+Trước khi cấu hình trên VPS, bạn vào trang quản trị DNS của tên miền **`hutailoc.shop`** (trên Cloudflare, Namecheap, iNET, PA Vietnam...):
+
+- **Tạo bản ghi A**:
+  - **Type**: `A`
+  - **Name (Host)**: `thanhle`
+  - **Value (IPv4)**: `[Địa chỉ IP VPS của bạn]` (Ví dụ: `161.248.4.83`)
+  - **TTL**: `Auto` hoặc `300s`
+  - *(Lưu ý: Nếu dùng Cloudflare, tạm thời để **DNS Only** - tắt đám mây cam để chạy lệnh cấp chứng chỉ SSL Certbot không bị lỗi).*
 
 ---
 
 ## 📝 BƯỚC 1: Đẩy Mã Nguồn Lên Git (Máy Local)
 
-Thực hiện các lệnh sau trên máy tính cá nhân của bạn để đẩy mã nguồn lên GitHub:
+Thực hiện các lệnh sau trên terminal máy tính cá nhân của bạn để đẩy toàn bộ code mới nhất lên GitHub:
 
 ```bash
 git add .
-git commit -m "Update MySQL docker container & subdomain shoppe.khoahocdrivemh.pro.vn"
+git commit -m "Configure production deployment for subdomain thanhle.hutailoc.shop"
 git push origin main
 ```
 
@@ -29,10 +42,10 @@ git push origin main
 
 Đăng nhập vào VPS qua SSH:
 ```bash
-ssh root@161.248.4.83
+ssh root@<IP_VPS_CUA_BAN>
 ```
 
-### 2.1 Cài đặt Docker & Docker Compose Plugin (Ubuntu/Debian):
+### 2.1 Cài đặt Docker & Docker Compose Plugin (nếu VPS mới):
 ```bash
 # Cập nhật hệ thống
 sudo apt update && sudo apt upgrade -y
@@ -49,6 +62,13 @@ docker --version
 docker compose version
 ```
 
+### 2.2 Tạo bộ nhớ ảo Swap (Khuyên dùng cho VPS 1GB - 2GB RAM):
+Tránh bị tràn bộ nhớ (Out of Memory - exit code 1) khi build Frontend:
+```bash
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
 ---
 
 ## 📥 BƯỚC 3: Tải Mã Nguồn Về Server & Cấu Hình
@@ -56,88 +76,68 @@ docker compose version
 ### 3.1 Clone kho lưu trữ Git về VPS:
 ```bash
 cd /var/www/
-git clone https://github.com/Hungmai06/shoppeback.git shoppeback
-cd shoppeback
+git clone https://github.com/Hungmai06/thanhle.git thanhle
+cd thanhle
 ```
 
-### 3.2 Kiểm tra file `docker-compose.yml`:
-Có thể tùy chỉnh lại Mật khẩu MySQL hoặc `JWT_SECRET` trong `docker-compose.yml`:
-```bash
-nano docker-compose.yml
-```
+*(Nếu thư mục đã có từ trước, chỉ cần vào thư mục và kéo code mới: `cd /var/www/thanhle && git pull origin main`)*
 
 ---
 
-## 🚀 BƯỚC 4: Khởi Chạy Hệ Thống (3 Containers)
+## 🚀 BƯỚC 4: Khởi Chạy Hệ Thống Docker
 
-Thực hiện lệnh sau trên VPS để tự động build và bật 3 Container (`MySQL`, `Backend`, `Frontend`):
+Thực hiện lệnh sau trên VPS tại thư mục `/var/www/thanhle` để build và chạy 3 containers:
 
 ```bash
 docker compose up -d --build
 ```
 
 > ⚡ **Kết quả mong đợi:**
-> - MySQL 8.0 khởi chạy và tự động khởi tạo Database `affiliateshoppe`.
-> - Node.js Backend đợi MySQL sẵn sàng (`service_healthy`) rồi tự động chạy Migrations/Seeds.
-> - Frontend Nginx sẵn sàng đón nhận truy cập tại subdomain **`shoppe.khoahocdrivemh.pro.vn`**.
-
-> 💡 **Mẹo xử lý nếu VPS thiếu RAM khi build (Lỗi exit code 1 / OOM):**
-> Nếu VPS có RAM 1GB - 2GB, hãy tạo bộ nhớ ảo (Swap) trước khi build để tránh bị tràn RAM:
-> ```bash
-> sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
-> echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-> ```
+> - MariaDB/MySQL khởi chạy và tự động khởi tạo Database `affiliateshoppe`.
+> - Node.js Backend kết nối Database, tự động chạy Migrations/Seeds khởi tạo admin và dữ liệu hệ thống.
+> - Frontend Nginx sẵn sàng đón nhận truy cập qua cổng nội bộ `8080`.
 
 ---
 
-## 🔍 BƯỚC 5: Kiểm Tra Trạng Thái & Nhật Ký Server
+## 🔍 BƯỚC 5: Kiểm Tra Trạng Thái Container
 
-### 5.1 Kiểm tra các container đang hoạt động:
 ```bash
 docker compose ps
 ```
-
-### 5.2 Xem log các service:
+Xem log nếu cần kiểm tra chi tiết:
 ```bash
-# Log tất cả các service
-docker compose logs -f
-
-# Log riêng Backend
 docker compose logs -f backend
-
-# Log riêng MySQL Database
-docker compose logs -f db
-
-# Log riêng Frontend Nginx
-docker compose logs -f frontend
 ```
-
-> 🛠️ **Nếu bị lỗi `container hoantien_mysql is unhealthy`:**
-> 1. Xem nguyên nhân log MySQL: `docker compose logs db`
-> 2. Nếu dữ liệu kho volume bị lỗi do lần khởi động đầu tiên ngắt đột ngột, hãy xóa volume và khởi chạy lại từ đầu:
->    ```bash
->    docker compose down -v
->    docker compose up -d --build
->    ```
 
 ---
 
-## 🔒 BƯỚC 6: Cấu Hình Nginx Host & SSL HTTPS Cho Subdomain `shoppe.khoahocdrivemh.pro.vn`
+## 🔒 BƯỚC 6: Cấu Hình Nginx Host & SSL HTTPS Cho Subdomain `thanhle.hutailoc.shop`
 
-Vì VPS đang chạy web khác trên cổng 80, Frontend Docker sẽ chạy tại cổng **8080** (`http://127.0.0.1:8080`).
+Vì VPS đang chạy Web Server chính (Nginx) đón cổng 80 & 443 ngoài Internet, ta sẽ cấu hình Host Nginx chuyển tiếp (Reverse Proxy) vào Container Frontend (cổng 8080).
 
-### 6.1 Tạo file cấu hình Nginx Reverse Proxy trên VPS:
+### 6.1 Cài đặt Nginx & Certbot trên VPS (nếu chưa có):
 ```bash
-sudo nano /etc/nginx/sites-available/shoppeback
+sudo apt install -y nginx certbot python3-certbot-nginx
 ```
-Dán nội dung sau vào:
+
+### 6.2 Tạo file cấu hình Nginx:
+```bash
+sudo nano /etc/nginx/sites-available/thanhle.hutailoc.shop
+```
+
+Dán nội dung cấu hình sau vào:
+
 ```nginx
 server {
-    server_name shoppe.khoahocdrivemh.pro.vn;
+    listen 80;
+    server_name thanhle.hutailoc.shop;
 
+    # Gzip Compression
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript image/svg+xml;
     gzip_min_length 256;
+
+    client_max_body_size 50M;
 
     location / {
         proxy_pass http://127.0.0.1:8080;
@@ -146,90 +146,68 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # Performance optimizations
+        # Performance & WebSocket
         proxy_http_version 1.1;
-        proxy_set_header Connection "";
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
         proxy_buffers 8 16k;
         proxy_buffer_size 32k;
+        proxy_read_timeout 90s;
     }
 }
 ```
-Kích hoạt config và reload Nginx:
+
+### 6.3 Kích hoạt cấu hình Nginx:
 ```bash
-sudo ln -sf /etc/nginx/sites-available/shoppeback /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/thanhle.hutailoc.shop /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### 6.2 Cài đặt SSL HTTPS miễn phí với Certbot:
+### 6.4 Cài đặt SSL HTTPS miễn phí với Certbot:
 ```bash
-sudo certbot --nginx -d shoppe.khoahocdrivemh.pro.vn
+sudo certbot --nginx -d thanhle.hutailoc.shop
 ```
+*(Certbot sẽ tự động cấu hình HTTPS SSL và tự gia hạn chứng chỉ khi hết hạn).*
 
 ---
 
-## 🔄 BƯỚC 7: Cập Nhật Phiên Bản Mới Khi Đẩy Code Lên Git
+## 🔄 BƯỚC 7: Cập Nhật Code Mỗi Khi Có Thay Đổi
 
-Mỗi khi bạn đẩy code mới lên GitHub (`git push origin main`), chạy 3 lệnh sau trên VPS để cập nhật **không bị mất dữ liệu**:
+Khi bạn sửa code và push lên GitHub từ máy cá nhân (`git push origin main`), bạn chỉ cần chạy 3 lệnh sau trên VPS:
 
 ```bash
-cd /var/www/shoppeback
+cd /var/www/thanhle
 git pull origin main
 docker compose up -d --build
 ```
+*Toàn bộ dữ liệu tài khoản, số dư, đơn hàng trong MySQL được bảo toàn tuyệt đối không bị mất.*
 
 ---
 
-## 🗄️ BƯỚC 8: Quản Lý Dữ Liệu MySQL
+## 🔑 BƯỚC 8: Cấu Hình Đăng Nhập Bằng Google Cho Subdomain Mới
 
-- **Sao lưu Database MySQL**:
-  ```bash
-  docker exec hoantien_mysql mysqldump -u root -proot_secure_password_123 affiliateshoppe > backup.sql
-  ```
-- **Khôi phục Database MySQL**:
-  ```bash
-  docker exec -i hoantien_mysql mysql -u root -proot_secure_password_123 affiliateshoppe < backup.sql
-  ```
+Để tính năng **"Đăng nhập bằng Google"** hoạt động trơn tru trên `https://thanhle.hutailoc.shop`:
+
+1. Truy cập [Google Cloud Console - Credentials](https://console.cloud.google.com/apis/credentials).
+2. Nhấp vào **OAuth 2.0 Client ID** mà dự án đang dùng (Web Client).
+3. Tại mục **Authorized JavaScript origins**, thêm:
+   - `https://thanhle.hutailoc.shop`
+   - `http://localhost:5173` *(cho máy local test)*
+4. Tại mục **Authorized redirect URIs**, thêm:
+   - `https://thanhle.hutailoc.shop`
+   - `http://localhost:5173`
+5. Bấm **Save (Lưu)**.
 
 ---
 
-## 🔑 BƯỚC 9: Cấu Hình Đăng Nhập Bằng Google (Google OAuth Trực Tiếp - Không cần Supabase)
+## 🗄️ BƯỚC 9: Lệnh Sao Lưu & Khôi Phục Database (Nếu Cần)
 
-Hệ thống đã tích hợp trực tiếp **Google Identity Services** qua thư viện `@react-oauth/google` (Frontend) và `google-auth-library` (Backend NodeJS + MySQL):
-
-### 1. Tạo Google OAuth Client ID (Mất ~2 phút)
-1. Truy cập [Google Cloud Console](https://console.cloud.google.com/).
-2. Tạo một Project mới (hoặc chọn project hiện có).
-3. Vào **APIs & Services ➔ OAuth consent screen**:
-   - Chọn **External** ➔ Bấm **Create**.
-   - Điền **App name** (VD: *Hoàn Tiền Shopee*), chọn email hỗ trợ và điền email liên hệ của bạn.
-   - Các bước tiếp theo (Scopes, Test Users) có thể bấm **Save and Continue** (mặc định lấy `email`, `profile`, `openid`).
-4. Vào **APIs & Services ➔ Credentials**:
-   - Bấm **Create Credentials ➔ OAuth client ID**.
-   - Application type: Chọn **Web application**.
-   - Name: *Web Client*.
-   - Tại mục **Authorized JavaScript origins**, thêm:
-     - `http://localhost:5173` (khi chạy máy tính cá nhân)
-     - `https://domain-cua-ban.com` (khi đưa lên hosting/VPS)
-   - Tại mục **Authorized redirect URIs**, thêm:
-     - `http://localhost:5173`
-     - `https://domain-cua-ban.com`
-   - Bấm **Create**.
-5. Bạn sẽ nhận được **Client ID** (chuỗi ký tự kết thúc bằng `.apps.googleusercontent.com`).
-
-### 2. Cập nhật Biến Môi Trường (`.env`)
-- **Frontend** (`Frontend/.env` hoặc `Frontend/.env.development`):
-  ```env
-  VITE_GOOGLE_CLIENT_ID=xxxxxx-xxxxxxxx.apps.googleusercontent.com
+- **Sao lưu Database**:
+  ```bash
+  docker exec hoantien_mysql mysqldump -u root -proot_secure_password_123 affiliateshoppe > /var/www/backup_$(date +%F).sql
   ```
-- **Backend** (`Backend/.env`):
-  ```env
-  GOOGLE_CLIENT_ID=xxxxxx-xxxxxxxx.apps.googleusercontent.com
+- **Khôi phục Database**:
+  ```bash
+  docker exec -i hoantien_mysql mysql -u root -proot_secure_password_123 affiliateshoppe < /var/www/backup_xxx.sql
   ```
-
-### 3. Trải nghiệm
-- Người dùng chỉ cần bấm nút **"Đăng nhập bằng Google"** trên Modal hoặc trang Đăng nhập / Đăng ký.
-- Nếu email chưa từng có trong MySQL: Hệ thống **tự động tạo tài khoản mới** (mã `USR...`, ví tiền, mã giới thiệu, affiliate tracking sub ID) và đăng nhập ngay.
-- Nếu email đã có: Hệ thống tự động đồng bộ avatar và đăng nhập cấp JWT Token bình thường.
-
-
