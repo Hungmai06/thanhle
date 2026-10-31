@@ -2,7 +2,7 @@ services:
   # 1. MariaDB Database Container (MySQL 8.0 Compatible)
   db:
     image: mariadb:10.11
-    container_name: hoantien_mysql
+    container_name: thanhle_mysql
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root_secure_password_123
@@ -10,17 +10,17 @@ services:
       MYSQL_USER: shoppe_user
       MYSQL_PASSWORD: shoppe_password_123
     volumes:
-      - mysql_data:/var/lib/mysql
+      - thanhle_mysql_data:/var/lib/mysql
 
   # 2. Node.js Backend API Container
   backend:
     build:
       context: ./Backend
       dockerfile: Dockerfile
-    container_name: hoantien_backend
+    container_name: thanhle_backend
     restart: always
     ports:
-      - "5000:5000"
+      - "5001:5000"
     environment:
       - PORT=5000
       - NODE_ENV=production
@@ -50,13 +50,13 @@ services:
       dockerfile: Dockerfile
       args:
         - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID:-335312329426-br7u9qiohc9c8a5aqu7e3k4jlrrbptr6.apps.googleusercontent.com}
-    container_name: hoantien_frontend
+    container_name: thanhle_frontend
     restart: always
     ports:
-      - "8080:80"
+      - "8081:80"
     depends_on:
       - backend
 
 volumes:
-  mysql_data:
+  thanhle_mysql_data:
     driver: local

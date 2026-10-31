@@ -6,10 +6,10 @@ Tài liệu này hướng dẫn chi tiết từng bước để đẩy mã ngu�
 
 ## 🛠️ Kiến Trúc Hệ Thống Trong Docker (3 Service)
 
-Dự án đã được đóng gói thành **3 Container Docker** kết nối qua mạng nội bộ:
-1. **Database Container (`hoantien_mysql`)**: Chạy cơ sở dữ liệu **MariaDB 10.11 / MySQL 8.0** độc lập. Toàn bộ dữ liệu tài khoản, đơn hàng và số dư được lưu trữ bền vững vào Docker Volume (`mysql_data`).
-2. **Backend Container (`hoantien_backend`)**: Chạy Node.js API (Cổng `5000`), kết nối trực tiếp với Database Container (`db:3306`).
-3. **Frontend Container (`hoantien_frontend`)**: Chạy React Nginx Web Server (Cổng `8080:80`), phục vụ subdomain **`thanhle.hutailoc.shop`** và Reverse Proxy tất cả yêu cầu `/api/` về Backend.
+Dự án đã được đặt tên riêng biệt với tiền tố **`thanhle_`** để hoàn toàn không bị xung đột với các website hoặc container khác đang chạy trên VPS:
+1. **Database Container (`thanhle_mysql`)**: Chạy cơ sở dữ liệu **MariaDB 10.11 / MySQL 8.0** độc lập. Toàn bộ dữ liệu tài khoản, đơn hàng và số dư được lưu trữ bền vững vào Docker Volume (`thanhle_mysql_data`).
+2. **Backend Container (`thanhle_backend`)**: Chạy Node.js API (Cổng ánh xạ `5001:5000`), kết nối trực tiếp với Database Container (`db:3306`).
+3. **Frontend Container (`thanhle_frontend`)**: Chạy React Nginx Web Server (Cổng ánh xạ `8081:80`), phục vụ subdomain **`thanhle.hutailoc.shop`** và Reverse Proxy tất cả yêu cầu `/api/` về Backend.
 
 ---
 
@@ -32,7 +32,7 @@ Thực hiện các lệnh sau trên terminal máy tính cá nhân của bạn đ
 
 ```bash
 git add .
-git commit -m "Configure production deployment for subdomain thanhle.hutailoc.shop"
+git commit -m "Update unique container names and ports for thanhle.hutailoc.shop"
 git push origin main
 ```
 
@@ -73,14 +73,13 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 ## 📥 BƯỚC 3: Tải Mã Nguồn Về Server & Cấu Hình
 
-### 3.1 Clone kho lưu trữ Git về VPS:
+### 3.1 Vào thư mục mã nguồn trên VPS:
 ```bash
-cd /var/www/
-git clone https://github.com/Hungmai06/thanhle.git thanhle
-cd thanhle
+cd /var/www/thanhle
+git pull origin main
 ```
 
-*(Nếu thư mục đã có từ trước, chỉ cần vào thư mục và kéo code mới: `cd /var/www/thanhle && git pull origin main`)*
+*(Nếu là server mới chưa clone repo: `cd /var/www && git clone https://github.com/Hungmai06/thanhle.git thanhle && cd thanhle`)*
 
 ---
 
@@ -93,9 +92,9 @@ docker compose up -d --build
 ```
 
 > ⚡ **Kết quả mong đợi:**
-> - MariaDB/MySQL khởi chạy và tự động khởi tạo Database `affiliateshoppe`.
-> - Node.js Backend kết nối Database, tự động chạy Migrations/Seeds khởi tạo admin và dữ liệu hệ thống.
-> - Frontend Nginx sẵn sàng đón nhận truy cập qua cổng nội bộ `8080`.
+> - MariaDB/MySQL khởi chạy trong container `thanhle_mysql` và tự động khởi tạo Database `affiliateshoppe`.
+> - Node.js Backend khởi chạy trong container `thanhle_backend`, tự động chạy Migrations/Seeds.
+> - Frontend Nginx khởi chạy trong container `thanhle_frontend`, mở cổng `8081`.
 
 ---
 
@@ -113,7 +112,7 @@ docker compose logs -f backend
 
 ## 🔒 BƯỚC 6: Cấu Hình Nginx Host & SSL HTTPS Cho Subdomain `thanhle.hutailoc.shop`
 
-Vì VPS đang chạy Web Server chính (Nginx) đón cổng 80 & 443 ngoài Internet, ta sẽ cấu hình Host Nginx chuyển tiếp (Reverse Proxy) vào Container Frontend (cổng 8080).
+Vì VPS đang chạy Web Server chính (Nginx) đón cổng 80 & 443 ngoài Internet, ta sẽ cấu hình Host Nginx chuyển tiếp (Reverse Proxy) vào Container Frontend (cổng 8081).
 
 ### 6.1 Cài đặt Nginx & Certbot trên VPS (nếu chưa có):
 ```bash
@@ -125,7 +124,7 @@ sudo apt install -y nginx certbot python3-certbot-nginx
 sudo nano /etc/nginx/sites-available/thanhle.hutailoc.shop
 ```
 
-Dán nội dung cấu hình sau vào:
+Dán nội dung cấu hình sau vào (lưu ý cổng **`8081`**):
 
 ```nginx
 server {
@@ -140,7 +139,7 @@ server {
     client_max_body_size 50M;
 
     location / {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:8081;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -174,7 +173,7 @@ sudo certbot --nginx -d thanhle.hutailoc.shop
 
 ## 🔄 BƯỚC 7: Cập Nhật Code Mỗi Khi Có Thay Đổi
 
-Khi bạn sửa code và push lên GitHub từ máy cá nhân (`git push origin main`), bạn chỉ cần chạy 3 lệnh sau trên VPS:
+Khi bạn sửa code và push lên GitHub từ máy cá nhân (`git push origin main`), bạn chỉ cần chạy 2 lệnh sau trên VPS:
 
 ```bash
 cd /var/www/thanhle
@@ -205,9 +204,9 @@ docker compose up -d --build
 
 - **Sao lưu Database**:
   ```bash
-  docker exec hoantien_mysql mysqldump -u root -proot_secure_password_123 affiliateshoppe > /var/www/backup_$(date +%F).sql
+  docker exec thanhle_mysql mysqldump -u root -proot_secure_password_123 affiliateshoppe > /var/www/backup_$(date +%F).sql
   ```
 - **Khôi phục Database**:
   ```bash
-  docker exec -i hoantien_mysql mysql -u root -proot_secure_password_123 affiliateshoppe < /var/www/backup_xxx.sql
+  docker exec -i thanhle_mysql mysql -u root -proot_secure_password_123 affiliateshoppe < /var/www/backup_xxx.sql
   ```
