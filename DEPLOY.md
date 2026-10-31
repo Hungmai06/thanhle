@@ -9,7 +9,7 @@ Tài liệu này hướng dẫn chi tiết từng bước để đẩy mã ngu�
 Dự án đã được đặt tên riêng biệt với tiền tố **`thanhle_`** để hoàn toàn không bị xung đột với các website hoặc container khác đang chạy trên VPS:
 1. **Database Container (`thanhle_mysql`)**: Chạy cơ sở dữ liệu **MariaDB 10.11 / MySQL 8.0** độc lập. Toàn bộ dữ liệu tài khoản, đơn hàng và số dư được lưu trữ bền vững vào Docker Volume (`thanhle_mysql_data`).
 2. **Backend Container (`thanhle_backend`)**: Chạy Node.js API (Cổng ánh xạ `5001:5000`), kết nối trực tiếp với Database Container (`db:3306`).
-3. **Frontend Container (`thanhle_frontend`)**: Chạy React Nginx Web Server (Cổng ánh xạ `8081:80`), phục vụ subdomain **`thanhle.hutailoc.shop`** và Reverse Proxy tất cả yêu cầu `/api/` về Backend.
+3. **Frontend Container (`thanhle_frontend`)**: Chạy React Nginx Web Server (Cổng ánh xạ `8388:80`), phục vụ subdomain **`thanhle.hutailoc.shop`** và Reverse Proxy tất cả yêu cầu `/api/` về Backend.
 
 ---
 
@@ -94,7 +94,7 @@ docker compose up -d --build
 > ⚡ **Kết quả mong đợi:**
 > - MariaDB/MySQL khởi chạy trong container `thanhle_mysql` và tự động khởi tạo Database `affiliateshoppe`.
 > - Node.js Backend khởi chạy trong container `thanhle_backend`, tự động chạy Migrations/Seeds.
-> - Frontend Nginx khởi chạy trong container `thanhle_frontend`, mở cổng `8081`.
+> - Frontend Nginx khởi chạy trong container `thanhle_frontend`, mở cổng `8388`.
 
 ---
 
@@ -112,7 +112,7 @@ docker compose logs -f backend
 
 ## 🔒 BƯỚC 6: Cấu Hình Nginx Host & SSL HTTPS Cho Subdomain `thanhle.hutailoc.shop`
 
-Vì VPS đang chạy Web Server chính (Nginx) đón cổng 80 & 443 ngoài Internet, ta sẽ cấu hình Host Nginx chuyển tiếp (Reverse Proxy) vào Container Frontend (cổng 8081).
+Vì VPS đang chạy Web Server chính (Nginx) đón cổng 80 & 443 ngoài Internet, ta sẽ cấu hình Host Nginx chuyển tiếp (Reverse Proxy) vào Container Frontend (cổng 8388).
 
 ### 6.1 Cài đặt Nginx & Certbot trên VPS (nếu chưa có):
 ```bash
@@ -124,7 +124,7 @@ sudo apt install -y nginx certbot python3-certbot-nginx
 sudo nano /etc/nginx/sites-available/thanhle.hutailoc.shop
 ```
 
-Dán nội dung cấu hình sau vào (lưu ý cổng **`8081`**):
+Dán nội dung cấu hình sau vào (lưu ý cổng **`8388`**):
 
 ```nginx
 server {
@@ -139,7 +139,7 @@ server {
     client_max_body_size 50M;
 
     location / {
-        proxy_pass http://127.0.0.1:8081;
+        proxy_pass http://127.0.0.1:8388;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

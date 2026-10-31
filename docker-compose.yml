@@ -19,8 +19,6 @@ services:
       dockerfile: Dockerfile
     container_name: thanhle_backend
     restart: always
-    ports:
-      - "5001:5000"
     environment:
       - PORT=5000
       - NODE_ENV=production
@@ -53,7 +51,7 @@ services:
     container_name: thanhle_frontend
     restart: always
     ports:
-      - "8081:80"
+      - "8388:80"
     depends_on:
       - backend
 
