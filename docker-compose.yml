@@ -1,0 +1,62 @@
+services:
+  # 1. MariaDB Database Container (MySQL 8.0 Compatible)
+  db:
+    image: mariadb:10.11
+    container_name: hoantien_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secure_password_123
+      MYSQL_DATABASE: affiliateshoppe
+      MYSQL_USER: shoppe_user
+      MYSQL_PASSWORD: shoppe_password_123
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  # 2. Node.js Backend API Container
+  backend:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: hoantien_backend
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      - DB_TYPE=mysql
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=shoppe_user
+      - DB_PASSWORD=shoppe_password_123
+      - DB_NAME=affiliateshoppe
+      - JWT_SECRET=supersecretjwtkey_123456789_shoppe
+      - SHOPEE_AFFILIATE_ID=173401900099
+      - ADDLIVETAG_API_KEY=${ADDLIVETAG_API_KEY:-}
+      - RIOHUB_API_KEY=${RIOHUB_API_KEY:-}
+      - RIOHUB_CREATOR_USERNAME=${RIOHUB_CREATOR_USERNAME:-hungrevieweverything}
+      - RIOHUB_WEBHOOK_SECRET=${RIOHUB_WEBHOOK_SECRET:-}
+      - CLUSTER_MODE=false
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-335312329426-br7u9qiohc9c8a5aqu7e3k4jlrrbptr6.apps.googleusercontent.com}
+    volumes:
+      - ./Backend/uploads:/app/uploads
+    depends_on:
+      - db
+
+  # 3. React Frontend Nginx Web Server Container
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID:-335312329426-br7u9qiohc9c8a5aqu7e3k4jlrrbptr6.apps.googleusercontent.com}
+    container_name: hoantien_frontend
+    restart: always
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
+    driver: local

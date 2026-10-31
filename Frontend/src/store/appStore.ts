@@ -1,0 +1,1233 @@
+import { create } from 'zustand';
+
+export interface Order {
+  id: string;
+  productName: string;
+  productImage: string;
+  orderAmount: number;
+  estimatedCashback: number;
+  realCashback?: number;
+  shopeeCommission?: number;
+  tiktokCommission?: number;
+  platform?: 'shopee' | 'tiktok';
+  status: 'pending' | 'approved' | 'rejected' | 'returned' | 'paid';
+  createdTime: string;
+  userId: string;
+  productUrl?: string;
+  shopId?: string;
+  itemId?: string;
+  subId?: string;
+  userName?: string;
+  userEmail?: string;
+  screenshot?: string;
+  notes?: string;
+}
+
+export interface Withdrawal {
+  id: string;
+  userId: string;
+  amount: number;
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requestDate: string;
+  processedDate?: string;
+  notes?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+  telegramChatId: string;
+  emailNotify: boolean;
+  telegramNotify: boolean;
+  role: 'user' | 'admin';
+  status?: 'active' | 'locked';
+  balance?: number;
+  totalCashback?: number;
+  pendingCashback?: number;
+  referralEarnings?: number;
+  referredBy?: string;
+  totalWithdrawn?: number;
+  completedOrderCashback?: number;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  content: string;
+  time: string;
+  read: boolean;
+  type: 'order' | 'wallet' | 'system';
+}
+
+export interface SystemSettings {
+  commissionPercentage: number;
+  cashbackPercentage: number;
+  telegramNotification: boolean;
+  emailNotification: boolean;
+  maintenanceMode: boolean;
+  websiteName?: string;
+  supportPhone?: string;
+  supportZalo?: string;
+  supportFacebook?: string;
+  shopeeAffiliateId?: string;
+  shopeeCookieUrl?: string;
+  addlivetagApiKey?: string;
+  lazadaAffiliateId?: string;
+  lazadaCookieUrl?: string;
+  tiktokAffiliateId?: string;
+  tiktokCookieUrl?: string;
+  tikiAffiliateId?: string;
+  tikiCookieUrl?: string;
+  hasRiohubApiKey?: boolean;
+  riohubCreatorUsername?: string;
+  riohubApiKey?: string;
+  riohubWebhookSecret?: string;
+}
+
+export interface UserStats {
+  pendingCashback: number;
+  totalApprovedCashback100: number;
+  approvedCashback: number;
+  paidWithdrawals: number;
+  pendingWithdrawals: number;
+  availableBalance: number;
+}
+
+export interface AdminStats {
+  summary: {
+    totalUsers: number;
+    totalOrders: number;
+    totalPaidWithdrawals: number;
+    pendingWithdrawalsTotal?: number;
+    platformTotalRevenue: number;
+    platformTotalCashbackOwed: number;
+    netProfit: number;
+    remainingAfterPayout?: number;
+  };
+  platformBreakdown?: {
+    shopee?: { totalOrders: number; orderAmount: number; revenue: number; cashback: number; profit: number; approvedCount: number; pendingCount: number };
+    tiktok?: { totalOrders: number; orderAmount: number; revenue: number; cashback: number; profit: number; approvedCount: number; pendingCount: number };
+  };
+  currentPlatform?: string;
+  statusDistribution: { name: string; value: number }[];
+  monthlyAnalytics: { name: string; revenue: number; cashback: number; profit: number; shopeeRevenue?: number; tiktokRevenue?: number; pendingRevenue?: number; pendingCashback?: number }[];
+  dailyAnalytics?: { date: string; day: number; dayLabel: string; revenue: number; cashback: number; profit: number; orderCount: number; shopeeRevenue?: number; tiktokRevenue?: number; shopeeOrderCount?: number; tiktokOrderCount?: number; pendingRevenue?: number; pendingCashback?: number }[];
+  selectedMonth?: string;
+  availableMonths?: { key: string; label: string }[];
+  topUsers?: { userId: string; userName: string; earnings: number; orderCount: number }[];
+  topProducts?: { name: string; count: number; totalAmount: number }[];
+}
+
+interface AppState {
+  // Theme state
+  theme: 'light' | 'dark';
+  toggleTheme: () => void;
+
+  // Auth state
+  currentUser: UserProfile | null;
+  isAuthLoading: boolean;
+  users: UserProfile[];
+  userStats: UserStats | null;
+  adminStats: AdminStats | null;
+  isAuthModalOpen: boolean;
+  authModalMode: 'login' | 'register' | 'forgot' | 'reset';
+  openAuthModal: (mode?: 'login' | 'register' | 'forgot' | 'reset') => void;
+  closeAuthModal: () => void;
+  setCurrentUser: (user: UserProfile | null) => void;
+  initializeAuth: () => Promise<void>;
+  login: (email: string, password: string) => Promise<UserProfile | null>;
+  loginWithGoogle: (
+    tokenOrOptions?: string | { credential?: string; accessToken?: string; email?: string; name?: string; avatar?: string; referralCode?: string },
+    email?: string,
+    name?: string,
+    avatar?: string,
+    referralCode?: string
+  ) => Promise<UserProfile | null>;
+  register: (name: string, email: string, password: string, referralCode?: string) => Promise<boolean>;
+  logout: () => void;
+  updateProfile: (profile: Partial<UserProfile>) => Promise<boolean>;
+
+  // Orders state (Shopee)
+  orders: Order[];
+  totalAdminOrders: number;
+  addOrder: (order: Order) => Promise<void>;
+  createAdminOrder: (orderData: Partial<Order>) => Promise<boolean>;
+  updateOrderStatus: (id: string, status: Order['status'], realCashback?: number, notes?: string, userId?: string) => Promise<void>;
+  deleteOrderAdmin: (id: string) => Promise<boolean>;
+  uploadOrderScreenshot: (id: string, screenshotUrl: string) => void;
+
+  // TikTok Orders state
+  tiktokOrders: Order[];
+  totalAdminTikTokOrders: number;
+  tiktokStats: { totalOrders: number; approvedOrders: number; totalRevenue: number; totalCommission: number; totalCashback: number; pendingOrders?: number; pendingRevenue?: number; pendingCommission?: number; pendingCashback?: number } | null;
+  fetchAdminTikTokOrders: (page?: number, limit?: number, search?: string, status?: string) => Promise<void>;
+  updateTikTokOrderStatus: (id: string, status: Order['status'], realCashback?: number, notes?: string, userId?: string) => Promise<void>;
+  createAdminTikTokOrder: (orderData: Partial<Order>) => Promise<boolean>;
+  deleteTikTokOrderAdmin: (id: string) => Promise<boolean>;
+  syncTikTokOrdersAdmin: (filters?: any) => Promise<{ success: boolean; message: string }>;
+  fetchRiohubLiveOrders: (filters?: any) => Promise<{
+    success: boolean;
+    creator_username?: string;
+    page?: number;
+    page_size?: number;
+    total?: number;
+    orders?: any[];
+    message?: string;
+  }>;
+  clearAllTikTokOrdersAdmin: (onlyUnassigned?: boolean) => Promise<boolean>;
+
+  // Withdrawals state
+  withdrawals: Withdrawal[];
+  addWithdrawalRequest: (amount: number, bankName: string, accountNumber: string, accountHolder: string) => Promise<boolean>;
+  updateWithdrawalStatus: (id: string, status: Withdrawal['status']) => Promise<void>;
+
+  // Favorites state
+  favorites: string[];
+  toggleFavorite: (productId: string) => void;
+
+  // Notifications state
+  notifications: Notification[];
+  markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: () => Promise<void>;
+  addNotification: (title: string, content: string, type: Notification['type']) => void;
+
+  // System Settings state
+  settings: SystemSettings;
+  updateSettings: (settings: Partial<SystemSettings>) => Promise<void>;
+
+  // Reconciliation state
+  reconciliationHistory: {
+    id: string;
+    fileName: string;
+    uploadTime: string;
+    totalRows: number;
+    matchedCount: number;
+    duplicateCount: number;
+    invalidCount: number;
+    missingCount: number;
+  }[];
+  addReconciliationLog: (log: AppState['reconciliationHistory'][0]) => void;
+
+  // Fetch helpers
+  fetchUserOrders: () => Promise<void>;
+  fetchUserWithdrawals: () => Promise<void>;
+  fetchNotifications: () => Promise<void>;
+  fetchAdminOrders: (page?: number, limit?: number, search?: string, status?: string) => Promise<void>;
+  fetchAdminWithdrawals: () => Promise<void>;
+  fetchAdminUsers: () => Promise<void>;
+  fetchAdminStats: (range?: string, month?: string, platform?: string) => Promise<void>;
+  exportOrdersCSV: () => void;
+  fetchReconciliationLogs: () => Promise<void>;
+  uploadReconciliationCSV: (file: File) => Promise<any>;
+  applyReconciliationCSV: (tempFileName: string) => Promise<any>;
+  updateAdminUser: (id: string, userData: Partial<UserProfile>) => Promise<boolean>;
+  createAdminUser: (userData: { name: string; email: string; password: string; role: 'user' | 'admin'; phone?: string }) => Promise<boolean>;
+  deleteAdminUser: (id: string) => Promise<boolean>;
+  syncAdminUserBalances: () => Promise<boolean>;
+  resetUserPassword: (id: string, newPassword?: string) => Promise<boolean>;
+  toggleUserStatus: (id: string) => Promise<'active' | 'locked' | null>;
+}
+
+const API_BASE = import.meta.env.VITE_API_BASE || '/api';
+
+const getHeaders = () => {
+  const token = localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+};
+
+// fetch có timeout: tránh request treo vô hạn (iOS Safari hay giữ request pending khi kết nối bị đứt)
+const fetchWithTimeout = (url: string, init: RequestInit = {}, ms = 10000): Promise<Response> => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+};
+
+const getCachedUser = (): UserProfile | null => {
+  try {
+    const raw = localStorage.getItem('user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const useAppStore = create<AppState>((set, get) => ({
+  theme: 'light',
+  toggleTheme: () => set((state) => {
+    const nextTheme = state.theme === 'light' ? 'dark' : 'light';
+    if (nextTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    return { theme: nextTheme };
+  }),
+
+  currentUser: getCachedUser(),
+  isAuthLoading: Boolean(localStorage.getItem('token')),
+  users: [],
+  userStats: null,
+  adminStats: null,
+  isAuthModalOpen: false,
+  authModalMode: 'login',
+  openAuthModal: (mode = 'login') => set({ isAuthModalOpen: true, authModalMode: mode }),
+  closeAuthModal: () => set({ isAuthModalOpen: false }),
+  orders: [],
+  totalAdminOrders: 0,
+  tiktokOrders: [],
+  totalAdminTikTokOrders: 0,
+  tiktokStats: null,
+  withdrawals: [],
+  notifications: [],
+  reconciliationHistory: [],
+  favorites: [],
+
+  setCurrentUser: (user) => {
+    if (user) localStorage.setItem('user', JSON.stringify(user));
+    else localStorage.removeItem('user');
+    set({ currentUser: user });
+  },
+
+  initializeAuth: async () => {
+    // 1. Fetch public system settings (chạy song song, không chặn xác thực profile)
+    void (async () => {
+      try {
+        const res = await fetchWithTimeout(`${API_BASE}/settings`);
+        if (res.ok) {
+          const data = await res.json();
+          set({ settings: data });
+        }
+      } catch (error) {
+        console.error('Fetch settings failed:', error);
+      }
+    })();
+
+    // 2. Fetch authenticated profile if token exists
+    const token = localStorage.getItem('token');
+    if (!token) {
+      localStorage.removeItem('user');
+      set({ currentUser: null, isAuthLoading: false });
+      return;
+    }
+
+    try {
+      const res = await fetchWithTimeout(`${API_BASE}/auth/profile`, {
+        headers: getHeaders()
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const profile = data.profile;
+        localStorage.setItem('user', JSON.stringify(profile));
+        set({
+          currentUser: profile,
+          userStats: data.stats,
+          isAuthLoading: false // Ghi nhận xác thực thành công ngay lập tức
+        });
+
+        // Tải dữ liệu bổ sung chạy nền song song, không làm kẹt tiến trình xác thực
+        Promise.allSettled([
+          get().fetchUserOrders(),
+          get().fetchUserWithdrawals(),
+          get().fetchNotifications()
+        ]).catch(err => console.warn('Background sync error:', err));
+      } else {
+        // Token không hợp lệ hoặc đã hết hạn
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        set({ currentUser: null, userStats: null, isAuthLoading: false });
+      }
+    } catch (error) {
+      console.error('Initialize auth error:', error);
+      const cached = getCachedUser();
+      if (!cached) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        set({ currentUser: null, userStats: null, isAuthLoading: false });
+      } else {
+        set({ isAuthLoading: false });
+      }
+    }
+  },
+
+  login: async (email, password) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('token', data.token);
+        if (data.refreshToken) {
+          localStorage.setItem('refreshToken', data.refreshToken);
+        }
+        if (data.user) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
+        set({ currentUser: data.user, isAuthLoading: false });
+        await get().initializeAuth();
+        return data.user as UserProfile;
+      }
+      return null;
+    } catch (error) {
+      console.error('Login API error:', error);
+      return null;
+    }
+  },
+
+  loginWithGoogle: async (tokenOrOptions, email, name, avatar, referralCode) => {
+    try {
+      let bodyPayload: any = {};
+      if (typeof tokenOrOptions === 'object' && tokenOrOptions !== null) {
+        bodyPayload = tokenOrOptions;
+      } else {
+        const tokenStr: string = typeof tokenOrOptions === 'string' ? tokenOrOptions : '';
+        const isCredential = tokenStr.startsWith('eyJ');
+        bodyPayload = {
+          credential: isCredential ? tokenStr : undefined,
+          accessToken: isCredential ? undefined : (tokenStr || undefined),
+          email,
+          name,
+          avatar,
+          referralCode
+        };
+      }
+
+      const res = await fetchWithTimeout(`${API_BASE}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyPayload)
+      }, 20000);
+
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('token', data.token);
+        if (data.refreshToken) {
+          localStorage.setItem('refreshToken', data.refreshToken);
+        }
+        if (data.user) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
+        set({ currentUser: data.user, isAuthLoading: false });
+        // Không await: user đã có sẵn, đồng bộ dữ liệu chạy nền để đăng nhập Google phản hồi ngay
+        void get().initializeAuth();
+        return data.user as UserProfile;
+      }
+      return null;
+    } catch (error) {
+      console.error('Login with Google API error:', error);
+      return null;
+    }
+  },
+
+  register: async (name, email, password, referralCode) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, referralCode })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('token', data.token);
+        if (data.refreshToken) {
+          localStorage.setItem('refreshToken', data.refreshToken);
+        }
+        if (data.user) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
+        set({ currentUser: data.user, isAuthLoading: false });
+        await get().initializeAuth();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Register API error:', error);
+      return false;
+    }
+  },
+
+  logout: () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    set({
+      currentUser: null,
+      userStats: null,
+      adminStats: null,
+      orders: [],
+      totalAdminOrders: 0,
+      tiktokOrders: [],
+      totalAdminTikTokOrders: 0,
+      tiktokStats: null,
+      withdrawals: [],
+      notifications: [],
+      users: [],
+      isAuthLoading: false
+    });
+  },
+
+  updateProfile: async (profile) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/profile`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify(profile)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        set({ currentUser: data.user });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Update profile API error:', error);
+      return false;
+    }
+  },
+
+  // Orders
+  fetchUserOrders: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/orders/user`, { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        const mappedOrders = data.map((o: any) => ({
+          id: o.id,
+          productName: o.product_name,
+          productImage: o.product_image,
+          orderAmount: Math.floor(Number(o.order_amount) || 0),
+          estimatedCashback: Math.floor(Number(o.estimated_cashback) || 0),
+          realCashback: o.real_cashback !== null && o.real_cashback !== undefined ? Math.floor(Number(o.real_cashback)) : undefined,
+          shopeeCommission: o.shopee_commission !== null && o.shopee_commission !== undefined ? Math.floor(Number(o.shopee_commission)) : undefined,
+          platform: o.platform || 'shopee',
+          status: o.status,
+          createdTime: o.created_at,
+          userId: o.user_id,
+          notes: o.notes || undefined
+        }));
+        set({ orders: mappedOrders });
+      }
+    } catch (error) {
+      console.error('Fetch user orders error:', error);
+    }
+  },
+
+  addOrder: async (order) => {
+    // Record click log & persist pending order in DB
+    try {
+      await fetch(`${API_BASE}/orders/click-log`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          id: order.id,
+          clickId: order.id,
+          productUrl: order.productUrl || order.productName,
+          productName: order.productName,
+          productImage: order.productImage,
+          orderAmount: order.orderAmount,
+          estimatedCashback: order.estimatedCashback,
+          userId: order.userId,
+          shopId: order.shopId || '',
+          itemId: order.itemId || ''
+        })
+      });
+      // Visual feedback in local UI
+      set((state) => ({ orders: [order, ...state.orders] }));
+    } catch (error) {
+      console.error('Click log error:', error);
+    }
+  },
+
+  createAdminOrder: async (orderData) => {
+    try {
+      const res = await fetch(`${API_BASE}/orders/admin`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(orderData)
+      });
+
+      if (res.ok) {
+        await get().fetchAdminOrders();
+        await get().fetchAdminStats();
+        return true;
+      }
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || 'Không thể tạo đơn hàng');
+    } catch (error: any) {
+      console.error('Create admin order error:', error);
+      throw error;
+    }
+  },
+
+  updateOrderStatus: async (id, status, realCashback, notes, userId) => {
+    try {
+      const res = await fetch(`${API_BASE}/orders/admin/${id}/status`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({ status, realCashback, notes, userId })
+      });
+
+      if (res.ok) {
+        await get().fetchAdminOrders();
+        await get().fetchAdminStats();
+      }
+    } catch (error) {
+      console.error('Update order status error:', error);
+    }
+  },
+
+  deleteOrderAdmin: async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/orders/admin/${id}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+
+      if (res.ok) {
+        set((state) => ({
+          orders: state.orders.filter(o => o.id !== id),
+          totalAdminOrders: Math.max(0, state.totalAdminOrders - 1)
+        }));
+        await get().fetchAdminOrders();
+        await get().fetchAdminStats();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Delete order error:', error);
+      return false;
+    }
+  },
+
+  uploadOrderScreenshot: async (id, screenshotUrl) => {
+    set((state) => ({
+      orders: state.orders.map(o => o.id === id ? { ...o, screenshot: screenshotUrl } : o)
+    }));
+    try {
+      await fetch(`${API_BASE}/orders/${id}/screenshot`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({ screenshot: screenshotUrl })
+      });
+    } catch (error) {
+      console.error('Upload order screenshot error:', error);
+    }
+  },
+
+  // Withdrawals
+  fetchUserWithdrawals: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/withdrawals/user`, { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        set({ withdrawals: data });
+      }
+    } catch (error) {
+      console.error('Fetch user withdrawals error:', error);
+    }
+  },
+
+  addWithdrawalRequest: async (amount, bankName, accountNumber, accountHolder) => {
+    try {
+      const res = await fetch(`${API_BASE}/withdrawals/request`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ amount, bankName, accountNumber, accountHolder })
+      });
+
+      if (res.ok) {
+        await get().fetchUserWithdrawals();
+        await get().initializeAuth(); // refresh wallet stats
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Add withdrawal error:', error);
+      return false;
+    }
+  },
+
+  updateWithdrawalStatus: async (id, status) => {
+    try {
+      const res = await fetch(`${API_BASE}/withdrawals/admin/${id}/status`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({ status })
+      });
+
+      if (res.ok) {
+        await get().fetchAdminWithdrawals();
+        await get().fetchAdminStats();
+      }
+    } catch (error) {
+      console.error('Update withdrawal status error:', error);
+    }
+  },
+
+  // Favorites
+  toggleFavorite: (productId) => set((state) => {
+    const isFav = state.favorites.includes(productId);
+    const newFavs = isFav
+      ? state.favorites.filter(id => id !== productId)
+      : [...state.favorites, productId];
+    return { favorites: newFavs };
+  }),
+
+  // Notifications
+  fetchNotifications: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/notifications`, { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        set({ notifications: data });
+      }
+    } catch (error) {
+      console.error('Fetch notifications error:', error);
+    }
+  },
+
+  markNotificationAsRead: async (id) => {
+    // Keep client-side state responsive
+    set((state) => ({
+      notifications: state.notifications.map(n => n.id === id ? { ...n, read: true } : n)
+    }));
+  },
+
+  markAllNotificationsAsRead: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/notifications/read`, {
+        method: 'PUT',
+        headers: getHeaders()
+      });
+
+      if (res.ok) {
+        await get().fetchNotifications();
+      }
+    } catch (error) {
+      console.error('Mark all notification as read error:', error);
+    }
+  },
+
+  addNotification: (title, content, type) => {
+    set((state) => ({
+      notifications: [
+        {
+          id: `NT${Date.now()}`,
+          title,
+          content,
+          time: 'Vừa xong',
+          read: false,
+          type
+        },
+        ...state.notifications
+      ]
+    }));
+  },
+
+  // Settings
+  settings: {
+    commissionPercentage: 10,
+    cashbackPercentage: 50,
+    telegramNotification: true,
+    emailNotification: true,
+    maintenanceMode: false,
+    websiteName: "Hoàn Tiền Mua Sắm",
+    supportPhone: "0988.888.888",
+    supportZalo: "https://zalo.me/g/hoantienmuasam",
+    supportFacebook: "https://facebook.com/hoantienmuasam",
+    shopeeAffiliateId: "173401900099",
+    shopeeCookieUrl: "https://s.shopee.vn/an_redir",
+    addlivetagApiKey: "",
+    lazadaAffiliateId: "",
+    lazadaCookieUrl: "https://s.lazada.vn/s.an_redir",
+    tiktokAffiliateId: "",
+    tiktokCookieUrl: "https://vt.tiktok.com/an_redir",
+    tikiAffiliateId: "",
+    tikiCookieUrl: "https://tiki.vn/an_redir",
+  },
+
+  updateSettings: async (newSettings) => {
+    try {
+      const res = await fetch(`${API_BASE}/settings/admin`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify(newSettings)
+      });
+
+      if (res.ok) {
+        set((state) => ({
+          settings: { ...state.settings, ...newSettings }
+        }));
+      }
+    } catch (error) {
+      console.error('Update settings API error:', error);
+    }
+  },
+
+  // Admin and reconciliation fetches
+  fetchAdminOrders: async (page = 1, limit = 10, search = '', status = 'all') => {
+    try {
+      const url = new URL(`${API_BASE}/orders/admin`, window.location.origin);
+      url.searchParams.append('page', page.toString());
+      url.searchParams.append('limit', limit.toString());
+      if (search) url.searchParams.append('search', search);
+      if (status && status !== 'all') url.searchParams.append('status', status);
+
+      const res = await fetch(url.toString(), { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        const mappedOrders = data.orders.map((o: any) => ({
+          id: o.id,
+          productName: o.product_name,
+          productImage: o.product_image,
+          orderAmount: Math.floor(Number(o.order_amount) || 0),
+          estimatedCashback: Math.floor(Number(o.estimated_cashback) || 0),
+          realCashback: o.real_cashback !== null && o.real_cashback !== undefined ? Math.floor(Number(o.real_cashback)) : undefined,
+          shopeeCommission: o.shopee_commission !== null && o.shopee_commission !== undefined ? Math.floor(Number(o.shopee_commission)) : undefined,
+          status: o.status,
+          createdTime: o.created_at,
+          userId: o.user_id,
+          userName: o.user_name || undefined,
+          userEmail: o.user_email || undefined,
+          notes: o.notes || undefined
+        }));
+        set({ orders: mappedOrders, totalAdminOrders: data.pagination.total });
+      }
+    } catch (error) {
+      console.error('Fetch admin orders error:', error);
+    }
+  },
+
+  fetchAdminTikTokOrders: async (page = 1, limit = 10, search = '', status = 'all') => {
+    try {
+      const url = new URL(`${API_BASE}/tiktok/admin/orders`, window.location.origin);
+      url.searchParams.append('page', page.toString());
+      url.searchParams.append('limit', limit.toString());
+      if (search) url.searchParams.append('search', search);
+      if (status && status !== 'all') url.searchParams.append('status', status);
+
+      const res = await fetch(url.toString(), { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        const mappedOrders = (data.orders || []).map((o: any) => ({
+          id: o.id,
+          productName: o.product_name,
+          productImage: o.product_image,
+          orderAmount: Math.floor(Number(o.order_amount) || 0),
+          estimatedCashback: Math.floor(Number(o.estimated_cashback) || 0),
+          realCashback: o.real_cashback !== null && o.real_cashback !== undefined ? Math.floor(Number(o.real_cashback)) : undefined,
+          shopeeCommission: o.shopee_commission !== null && o.shopee_commission !== undefined ? Math.floor(Number(o.shopee_commission)) : undefined,
+          tiktokCommission: o.tiktok_commission !== null && o.tiktok_commission !== undefined ? Math.floor(Number(o.tiktok_commission)) : undefined,
+          platform: 'tiktok' as const,
+          status: o.status,
+          createdTime: o.created_at,
+          userId: o.user_id,
+          userName: o.user_name || undefined,
+          userEmail: o.user_email || undefined,
+          notes: o.notes || undefined,
+          subId: o.sub_id || undefined,
+          screenshot: o.screenshot || undefined
+        }));
+        set({
+          tiktokOrders: mappedOrders,
+          totalAdminTikTokOrders: data.total || 0,
+          tiktokStats: data.stats || null
+        });
+      }
+    } catch (error) {
+      console.error('Fetch admin tiktok orders error:', error);
+    }
+  },
+
+  createAdminTikTokOrder: async (orderData) => {
+    try {
+      const res = await fetch(`${API_BASE}/tiktok/admin/orders`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(orderData)
+      });
+      if (res.ok) {
+        await get().fetchAdminTikTokOrders();
+        await get().fetchAdminStats();
+        return true;
+      }
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || 'Không thể tạo đơn hàng TikTok');
+    } catch (error: any) {
+      console.error('Create admin tiktok order error:', error);
+      throw error;
+    }
+  },
+
+  updateTikTokOrderStatus: async (id, status, realCashback, notes, userId) => {
+    try {
+      const res = await fetch(`${API_BASE}/tiktok/admin/orders/${id}/status`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({ status, realCashback, notes, userId })
+      });
+      if (res.ok) {
+        await get().fetchAdminTikTokOrders();
+        await get().fetchAdminStats();
+      }
+    } catch (error) {
+      console.error('Update tiktok order status error:', error);
+    }
+  },
+
+  deleteTikTokOrderAdmin: async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/tiktok/admin/orders/${id}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        set((state) => ({
+          tiktokOrders: state.tiktokOrders.filter(o => o.id !== id),
+          totalAdminTikTokOrders: Math.max(0, state.totalAdminTikTokOrders - 1)
+        }));
+        await get().fetchAdminTikTokOrders();
+        await get().fetchAdminStats();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Delete tiktok order error:', error);
+      return false;
+    }
+  },
+
+  syncTikTokOrdersAdmin: async (filters = {}) => {
+    try {
+      const res = await fetch(`${API_BASE}/tiktok/sync-orders`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(filters)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await get().fetchAdminTikTokOrders();
+        await get().fetchAdminStats();
+        return { success: true, message: data.message || 'Đồng bộ đơn hàng TikTok thành công' };
+      }
+      return { success: false, message: data.message || 'Lỗi khi đồng bộ đơn hàng TikTok' };
+    } catch (error: any) {
+      console.error('Sync tiktok orders error:', error);
+      return { success: false, message: error.message || 'Lỗi kết nối khi đồng bộ' };
+    }
+  },
+
+  fetchRiohubLiveOrders: async (filters = {}) => {
+    try {
+      const q = new URLSearchParams();
+      Object.entries(filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && String(v).trim() !== '') {
+          q.append(k, String(v).trim());
+        }
+      });
+      const res = await fetch(`${API_BASE}/tiktok/admin/riohub-orders?${q.toString()}`, {
+        headers: getHeaders()
+      });
+      const data = await res.json();
+      if (res.ok) {
+        return { success: true, ...data };
+      }
+      return { success: false, message: data.message || 'Lỗi truy vấn đơn từ RioHub' };
+    } catch (error: any) {
+      console.error('Fetch RioHub orders error:', error);
+      return { success: false, message: error.message || 'Lỗi kết nối tới máy chủ' };
+    }
+  },
+
+  clearAllTikTokOrdersAdmin: async (onlyUnassigned = false) => {
+    try {
+      const res = await fetch(`${API_BASE}/tiktok/admin/orders/clear-all`, {
+        method: 'DELETE',
+        headers: getHeaders(),
+        body: JSON.stringify({ onlyUnassigned })
+      });
+      if (res.ok) {
+        await get().fetchAdminTikTokOrders();
+        await get().fetchAdminStats();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Clear all tiktok orders error:', error);
+      return false;
+    }
+  },
+
+  fetchAdminWithdrawals: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/withdrawals/admin`, { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        set({ withdrawals: data });
+      }
+    } catch (error) {
+      console.error('Fetch admin withdrawals error:', error);
+    }
+  },
+
+  fetchAdminUsers: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/admin/users`, { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        set({ users: data });
+      }
+    } catch (error) {
+      console.error('Fetch admin users error:', error);
+    }
+  },
+
+  updateAdminUser: async (id, userData) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/admin/users/${id}`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify(userData)
+      });
+
+      if (res.ok) {
+        await get().fetchAdminUsers();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Update admin user API error:', error);
+      return false;
+    }
+  },
+
+  createAdminUser: async (userData) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/admin/users`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(userData)
+      });
+      if (res.ok) {
+        await get().fetchAdminUsers();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Create admin user error:', error);
+      return false;
+    }
+  },
+
+  deleteAdminUser: async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/admin/users/${id}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        await get().fetchAdminUsers();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Delete admin user error:', error);
+      return false;
+    }
+  },
+
+  syncAdminUserBalances: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/admin/users/sync-balances`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        await get().fetchAdminUsers();
+        await get().fetchAdminStats();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Sync admin user balances error:', error);
+      return false;
+    }
+  },
+
+  resetUserPassword: async (id, newPassword) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/admin/users/${id}/reset-password`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({ newPassword: newPassword || '123456' })
+      });
+      return res.ok;
+    } catch (error) {
+      console.error('Reset password error:', error);
+      return false;
+    }
+  },
+
+  toggleUserStatus: async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/admin/users/${id}/toggle-status`, {
+        method: 'PUT',
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        await get().fetchAdminUsers();
+        return data.status as 'active' | 'locked';
+      }
+      return null;
+    } catch (error) {
+      console.error('Toggle user status error:', error);
+      return null;
+    }
+  },
+
+  fetchAdminStats: async (range = 'all', month = '', platform = 'all') => {
+    try {
+      let url = `${API_BASE}/settings/admin/stats?range=${range}&platform=${platform}`;
+      if (month) url += `&month=${month}`;
+      const res = await fetch(url, { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        set({ adminStats: data });
+      }
+    } catch (error) {
+      console.error('Fetch admin stats error:', error);
+    }
+  },
+
+  exportOrdersCSV: () => {
+    const orders = get().orders;
+
+    const headers = ['Mã đơn hàng', 'Mã thành viên', 'Tên sản phẩm', 'Giá trị đơn (₫)', 'Hoa hồng Shopee (₫)', 'Hoàn tiền khách (₫)', 'Ngày tạo', 'Trạng thái', 'Ghi chú'];
+    const rows = orders.map(o => {
+      const userCashback = Math.floor(o.realCashback !== undefined ? o.realCashback : o.estimatedCashback);
+      const shopeeComm = Math.floor(o.shopeeCommission !== undefined && o.shopeeCommission !== null ? o.shopeeCommission : userCashback * 2);
+      let statusStr: string = o.status;
+      if (o.status === 'pending') statusStr = 'Đang chờ xử lý';
+      if (o.status === 'approved') statusStr = 'Hoàn thành';
+      if (o.status === 'rejected') statusStr = 'Hủy';
+      if (o.status === 'returned') statusStr = 'Hoàn hàng';
+      if (o.status === 'paid') statusStr = 'Đã thanh toán';
+
+      return [
+        `"${o.id}"`,
+        `"${o.userId || ''}"`,
+        `"${(o.productName || '').replace(/"/g, '""')}"`,
+        Math.floor(o.orderAmount) || 0,
+        shopeeComm || 0,
+        userCashback || 0,
+        `"${o.createdTime || ''}"`,
+        `"${statusStr}"`,
+        `"${(o.notes || '').replace(/"/g, '""')}"`
+      ].join(',');
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Bao_Cao_Don_Hang_${new Date().toISOString().substring(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  },
+
+  fetchReconciliationLogs: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/reconciliation/logs`, { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        const mappedLogs = data.map((log: any) => ({
+          id: log.id,
+          fileName: log.file_name,
+          uploadTime: log.upload_time,
+          totalRows: log.total_rows,
+          matchedCount: log.matched_count,
+          duplicateCount: log.duplicate_count,
+          invalidCount: log.invalid_count,
+          missingCount: log.missing_count
+        }));
+        set({ reconciliationHistory: mappedLogs });
+      }
+    } catch (error) {
+      console.error('Fetch reconciliation logs error:', error);
+    }
+  },
+
+  uploadReconciliationCSV: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = localStorage.getItem('token');
+
+    try {
+      const res = await fetch(`${API_BASE}/reconciliation/upload`, {
+        method: 'POST',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: formData
+      });
+
+      if (res.ok) {
+        return await res.json();
+      }
+      throw new Error('Upload file đối soát thất bại');
+    } catch (error) {
+      console.error('Upload reconciliation error:', error);
+      throw error;
+    }
+  },
+
+  applyReconciliationCSV: async (tempFileName) => {
+    try {
+      const res = await fetch(`${API_BASE}/reconciliation/apply`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ tempFileName })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        await get().fetchReconciliationLogs();
+        await get().fetchAdminOrders();
+        await get().fetchAdminStats();
+        return data;
+      }
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.message || 'Áp dụng đối soát thất bại');
+    } catch (error) {
+      console.error('Apply reconciliation error:', error);
+      throw error;
+    }
+  },
+
+  addReconciliationLog: (log) => set((state) => ({
+    reconciliationHistory: [log, ...state.reconciliationHistory]
+  }))
+}));

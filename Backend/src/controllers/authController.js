@@ -1,0 +1,778 @@
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { getDatabase } = require('../config/db');
+const { ensureUuid } = require('../services/shopeeService');
+const { recalculateUserBalances, SIGNUP_BONUS_AMOUNT } = require('../services/balanceService');
+
+
+function generateAccessToken(id) {
+  return jwt.sign({ id }, process.env.JWT_SECRET || 'supersecretkey', {
+    expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '30d',
+  });
+}
+
+function generateRefreshToken(id) {
+  return jwt.sign({ id }, process.env.JWT_SECRET || 'supersecretkey', {
+    expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '90d',
+  });
+}
+
+async function register(req, res) {
+  const { name, email, password, referralCode } = req.body;
+
+  if (!name || !email || !password) {
+    return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin: họ tên, email và mật khẩu' });
+  }
+
+  try {
+    const db = await getDatabase();
+
+    // Check if user already exists
+    const userExists = await db.get('SELECT id FROM users WHERE email = ?', [email]);
+    if (userExists) {
+      return res.status(400).json({ message: 'Email này đã được đăng ký' });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    // Generate custom ID safely
+    const allUsrIds = await db.all("SELECT id FROM users WHERE id LIKE 'USR%'");
+    let maxUsrNum = 100;
+    for (const row of allUsrIds) {
+      const num = parseInt(String(row.id).substring(3), 10);
+      if (!isNaN(num) && num > maxUsrNum) maxUsrNum = num;
+    }
+    const nextId = `USR${maxUsrNum + 1}`;
+
+    // Check if referral code is valid
+    let validReferredBy = null;
+    if (referralCode) {
+      const referrer = await db.get('SELECT id FROM users WHERE id = ?', [referralCode.trim().toUpperCase()]);
+      if (referrer) {
+        validReferredBy = referrer.id;
+      }
+    }
+
+    // Generate affiliate sub id (UUID)
+    const affiliateSubId = ensureUuid(nextId);
+
+    // Insert user with +30,000đ signup bonus
+    await db.run(
+      `INSERT INTO users (id, name, email, password_hash, role, status, balance, signup_bonus, referred_by, affiliate_sub_id)
+       VALUES (?, ?, ?, ?, 'user', 'active', ?, ?, ?, ?)`,
+      [
+        nextId,
+        name,
+        email,
+        passwordHash,
+        SIGNUP_BONUS_AMOUNT,
+        SIGNUP_BONUS_AMOUNT,
+        validReferredBy,
+        affiliateSubId
+      ]
+    );
+
+    // Create welcome notification with +30k bonus info
+    const notifId = `NT${Date.now()}`;
+    await db.run(
+      `INSERT INTO notifications (id, user_id, title, content, type)
+       VALUES (?, ?, '🎁 Tặng 30.000đ Quà Đăng Ký Mới!', 'Chào mừng bạn đến với Hoàn Tiền Mua Sắm! Hệ thống đã cộng +30.000đ vào số dư ví của bạn. Mua sắm hoàn tiền hoặc giới thiệu bạn bè (+5.000đ/người khi hoàn thành đơn đầu) để đủ 50.000đ rút về ngân hàng ngay!', 'wallet')`,
+      [notifId, nextId]
+    );
+
+    // Notify referrer (+5k pending until F1 completes first order)
+    if (validReferredBy) {
+      const refNotifId = `NT${Date.now()}_REF`;
+      await db.run(
+        `INSERT INTO notifications (id, user_id, title, content, type)
+         VALUES (?, ?, '🎉 Mời bạn bè thành công (+5.000đ Chờ duyệt)', ?, 'wallet')`,
+        [
+          refNotifId,
+          validReferredBy,
+          `Thành viên mới "${name}" vừa đăng ký qua mã giới thiệu của bạn! +5.000đ đã được cộng vào mục Chờ duyệt và sẽ tự động chuyển vào Số dư khả dụng ngay khi cấp dưới hoàn thành đơn hàng đầu tiên.`
+        ]
+      );
+    }
+
+    const user = await db.get('SELECT id, name, email, role, balance, signup_bonus FROM users WHERE id = ?', [nextId]);
+
+    const accessToken = generateAccessToken(nextId);
+    const refreshToken = generateRefreshToken(nextId);
+
+    // Save refresh token to db
+    await db.run('UPDATE users SET refresh_token = ? WHERE id = ?', [refreshToken, nextId]);
+
+    res.status(201).json({
+      token: accessToken,
+      refreshToken: refreshToken,
+      user
+    });
+  } catch (error) {
+    console.error('Register Error:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi đăng ký tài khoản' });
+  }
+}
+
+async function login(req, res) {
+  const { email, password, role } = req.body;
+
+  try {
+    const db = await getDatabase();
+
+    // Find user
+    const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
+    if (!user) {
+      return res.status(400).json({ message: 'Thông tin đăng nhập không chính xác' });
+    }
+
+    // Check role
+    if (role && user.role !== role) {
+      return res.status(403).json({ message: `Tài khoản này không có quyền truy cập vai trò ${role}` });
+    }
+
+    // Verify password
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Thông tin đăng nhập không chính xác' });
+    }
+
+    if (user.status === 'locked') {
+      return res.status(403).json({ message: 'Tài khoản của bạn đã bị khóa' });
+    }
+
+    const accessToken = generateAccessToken(user.id);
+    const refreshToken = generateRefreshToken(user.id);
+
+    // Save refresh token to db
+    await db.run('UPDATE users SET refresh_token = ? WHERE id = ?', [refreshToken, user.id]);
+
+    const affiliateSubId = user.affiliate_sub_id || ensureUuid(user.id);
+
+    res.json({
+      token: accessToken,
+      refreshToken: refreshToken,
+      user: {
+        id: user.id,
+        affiliateSubId: affiliateSubId,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        bankName: user.bank_name,
+        accountNumber: user.account_number,
+        accountHolder: user.account_holder,
+        telegramChatId: user.telegram_chat_id,
+        emailNotify: !!user.email_notify,
+        telegramNotify: !!user.telegram_notify,
+        balance: user.balance || 0,
+        totalCashback: user.total_cashback || 0,
+        pendingCashback: user.pending_cashback || 0,
+        referralEarnings: user.referral_earnings || 0,
+        referredBy: user.referred_by || null,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Login Error:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi đăng nhập' });
+  }
+}
+
+async function getProfile(req, res) {
+  try {
+    const db = await getDatabase();
+    await recalculateUserBalances(db, [req.user.id]);
+    const user = await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+
+    // Get order and wallet stats from both Shopee and TikTok
+    const shopeeOrders = await db.all('SELECT status, real_cashback, estimated_cashback FROM orders WHERE user_id = ?', [user.id]);
+    const tiktokOrders = await db.all('SELECT status, real_cashback, estimated_cashback FROM tiktok_orders WHERE user_id = ?', [user.id]);
+    const orders = [...shopeeOrders, ...tiktokOrders];
+    const withdrawals = await db.all('SELECT amount, status FROM withdrawals WHERE user_id = ?', [user.id]);
+
+    // Calculate balances
+    const pendingCashback = orders
+      .filter(o => o.status === 'pending')
+      .reduce((sum, o) => sum + o.estimated_cashback, 0);
+
+    const approvedCashback = orders
+      .filter(o => o.status === 'approved' || o.status === 'paid')
+      .reduce((sum, o) => sum + (o.real_cashback || o.estimated_cashback), 0);
+
+    const approvedCashback100 = approvedCashback * 2; // raw 100% Shopee commission for reference
+
+    const paidWithdrawals = withdrawals
+      .filter(w => w.status === 'approved')
+      .reduce((sum, w) => sum + w.amount, 0);
+
+    const pendingWithdrawals = withdrawals
+      .filter(w => w.status === 'pending')
+      .reduce((sum, w) => sum + w.amount, 0);
+
+    const signupBonus = user.role === 'admin' ? 0 : Math.floor(Number(user.signup_bonus ?? SIGNUP_BONUS_AMOUNT));
+    const availableBalance = user.balance || 0;
+
+    const affiliateSubId = user.affiliate_sub_id || ensureUuid(user.id);
+
+    res.json({
+      profile: {
+        id: user.id,
+        affiliateSubId: affiliateSubId,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        phone: user.phone,
+        bankName: user.bank_name,
+        accountNumber: user.account_number,
+        accountHolder: user.account_holder,
+        telegramChatId: user.telegram_chat_id,
+        emailNotify: !!user.email_notify,
+        telegramNotify: !!user.telegram_notify,
+        balance: user.balance || 0,
+        signupBonus: signupBonus,
+        totalCashback: user.total_cashback || 0,
+        pendingCashback: user.pending_cashback || 0,
+        referralEarnings: user.referral_earnings || 0,
+        referredBy: user.referred_by || null,
+        role: user.role
+      },
+      stats: {
+        signupBonus,
+        pendingCashback,
+        approvedCashback100,
+        approvedCashback,
+        paidWithdrawals,
+        pendingWithdrawals,
+        availableBalance: user.balance || 0
+      }
+    });
+  } catch (error) {
+    console.error('Get Profile Error:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi lấy hồ sơ người dùng' });
+  }
+}
+
+async function updateProfile(req, res) {
+  const { name, phone, bankName, accountNumber, accountHolder, telegramChatId, emailNotify, telegramNotify } = req.body;
+
+  try {
+    const db = await getDatabase();
+
+    await db.run(
+      `UPDATE users
+       SET name = COALESCE(?, name),
+           phone = COALESCE(?, phone),
+           bank_name = COALESCE(?, bank_name),
+           account_number = COALESCE(?, account_number),
+           account_holder = COALESCE(?, account_holder),
+           telegram_chat_id = COALESCE(?, telegram_chat_id),
+           email_notify = COALESCE(?, email_notify),
+           telegram_notify = COALESCE(?, telegram_notify),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [
+        name,
+        phone,
+        bankName,
+        accountNumber,
+        accountHolder ? accountHolder.toUpperCase() : null,
+        telegramChatId,
+        emailNotify !== undefined ? (emailNotify ? 1 : 0) : null,
+        telegramNotify !== undefined ? (telegramNotify ? 1 : 0) : null,
+        req.user.id
+      ]
+    );
+
+    const updatedUser = await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+
+    res.json({
+      message: 'Cập nhật hồ sơ thành công',
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        bankName: updatedUser.bank_name,
+        accountNumber: updatedUser.account_number,
+        accountHolder: updatedUser.account_holder,
+        telegramChatId: updatedUser.telegram_chat_id,
+        emailNotify: !!updatedUser.email_notify,
+        telegramNotify: !!updatedUser.telegram_notify,
+        balance: updatedUser.balance || 0,
+        totalCashback: updatedUser.total_cashback || 0,
+        pendingCashback: updatedUser.pending_cashback || 0,
+        role: updatedUser.role
+      }
+    });
+  } catch (error) {
+    console.error('Update Profile Error:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi cập nhật hồ sơ' });
+  }
+}
+
+async function getNotifications(req, res) {
+  try {
+    const db = await getDatabase();
+    const notifications = await db.all(
+      'SELECT id, title, content, type, `read`, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC',
+      [req.user.id]
+    );
+
+    res.json(notifications.map(n => ({
+      id: n.id,
+      title: n.title,
+      content: n.content,
+      type: n.type,
+      read: !!n.read,
+      time: n.created_at
+    })));
+  } catch (error) {
+    console.error('Get Notifications Error:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi lấy thông báo' });
+  }
+}
+
+async function readNotifications(req, res) {
+  try {
+    const db = await getDatabase();
+    await db.run('UPDATE notifications SET `read` = 1 WHERE user_id = ?', [req.user.id]);
+    res.json({ message: 'Đã đánh dấu đọc tất cả thông báo' });
+  } catch (error) {
+    console.error('Read Notifications Error:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi đánh dấu đọc thông báo' });
+  }
+}
+
+async function adminGetUsers(req, res) {
+  try {
+    const db = await getDatabase();
+    const users = await db.all(
+      `SELECT u.id, u.name, u.email, u.phone, u.bank_name as bankName, 
+              u.account_number as accountNumber, u.account_holder as accountHolder, 
+              u.telegram_chat_id as telegramChatId, u.email_notify as emailNotify, 
+              u.telegram_notify as telegramNotify, u.role, u.status, u.balance, 
+              u.total_cashback as totalCashback, u.pending_cashback as pendingCashback, 
+              u.referral_earnings as referralEarnings,
+              u.referred_by as referredBy,
+              u.created_at as createdAt,
+              COALESCE((
+                SELECT SUM(w.amount) 
+                FROM withdrawals w 
+                WHERE w.user_id = u.id AND w.status = 'approved'
+              ), 0) as totalWithdrawn,
+              (COALESCE((
+                SELECT SUM(CASE WHEN o.real_cashback IS NOT NULL AND o.real_cashback > 0 THEN o.real_cashback ELSE o.estimated_cashback END)
+                FROM orders o 
+                WHERE o.user_id = u.id AND o.status IN ('approved', 'paid')
+              ), 0) + COALESCE((
+                SELECT SUM(CASE WHEN t.real_cashback IS NOT NULL AND t.real_cashback > 0 THEN t.real_cashback ELSE t.estimated_cashback END)
+                FROM tiktok_orders t
+                WHERE t.user_id = u.id AND t.status IN ('approved', 'paid')
+              ), 0)) as completedOrderCashback
+       FROM users u
+       ORDER BY u.created_at DESC`
+    );
+
+    const formattedUsers = users.map(u => ({
+      ...u,
+      balance: Math.floor(Number(u.balance) || 0),
+      totalCashback: Math.floor(Number(u.totalCashback) || 0),
+      totalWithdrawn: Math.floor(Number(u.totalWithdrawn) || 0),
+      completedOrderCashback: Math.floor(Number(u.completedOrderCashback) || 0),
+      referralEarnings: Math.floor(Number(u.referralEarnings) || 0)
+    }));
+
+    res.json(formattedUsers);
+  } catch (error) {
+    console.error('Admin Get Users Error:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi lấy danh sách người dùng' });
+  }
+}
+
+async function adminSyncBalances(req, res) {
+  try {
+    const db = await getDatabase();
+    await db.run('BEGIN TRANSACTION');
+    const result = await recalculateUserBalances(db);
+    await db.run('COMMIT');
+
+    res.json({ 
+      success: true, 
+      message: `Đã đồng bộ lại số dư cho ${result.updatedCount || 0} thành viên theo đúng các đơn hoàn thành và tiền đã rút!` 
+    });
+  } catch (error) {
+    const db = await getDatabase();
+    try { await db.run('ROLLBACK'); } catch (_) {}
+    console.error('Admin Sync Balances Error:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi đồng bộ số dư thành viên' });
+  }
+}
+
+async function adminUpdateUser(req, res) {
+  const { id } = req.params;
+  const { name, email, role, bankName, accountNumber, accountHolder, phone, balance } = req.body;
+
+  try {
+    const db = await getDatabase();
+    const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+
+    const parsedBalance = (balance !== undefined && balance !== null && balance !== '') ? Math.floor(parseFloat(balance) || 0) : user.balance;
+
+    await db.run(
+      `UPDATE users
+       SET name = COALESCE(?, name),
+           email = COALESCE(?, email),
+           role = COALESCE(?, role),
+           phone = COALESCE(?, phone),
+           bank_name = COALESCE(?, bank_name),
+           account_number = COALESCE(?, account_number),
+           account_holder = COALESCE(?, account_holder),
+           balance = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [name, email, role, phone, bankName, accountNumber, accountHolder ? accountHolder.toUpperCase() : null, isNaN(parsedBalance) ? user.balance : parsedBalance, id]
+    );
+
+    res.json({ message: 'Cập nhật thông tin thành viên thành công' });
+  } catch (error) {
+    console.error('Admin Update User Error:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi cập nhật thông tin thành viên' });
+  }
+}
+
+async function adminCreateUser(req, res) {
+  const { name, email, password, role, phone } = req.body;
+  if (!name || !email || !password) {
+    return res.status(400).json({ message: 'Vui lòng điền đầy đủ họ tên, email và mật khẩu' });
+  }
+
+  try {
+    const db = await getDatabase();
+    const existing = await db.get('SELECT id FROM users WHERE email = ?', [email]);
+    if (existing) {
+      return res.status(400).json({ message: 'Email này đã được sử dụng' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    const prefix = (role === 'admin') ? 'ADM' : 'USR';
+    const lastUser = await db.get(`SELECT id FROM users WHERE id LIKE '${prefix}%' ORDER BY created_at DESC LIMIT 1`);
+    let nextId = prefix === 'ADM' ? 'ADM100' : 'USR100';
+    if (lastUser && lastUser.id.startsWith(prefix)) {
+      const lastNum = parseInt(lastUser.id.substring(3));
+      nextId = `${prefix}${lastNum + 1}`;
+    }
+
+    await db.run(
+      `INSERT INTO users (id, name, email, password_hash, phone, avatar, role, status)
+       VALUES (?, ?, ?, ?, ?, '', ?, 'active')`,
+      [nextId, name, email, passwordHash, phone || '', role || 'user']
+    );
+
+    res.status(201).json({ message: 'Tạo tài khoản thành viên thành công', id: nextId });
+  } catch (error) {
+    console.error('Admin Create User Error:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi tạo tài khoản' });
+  }
+}
+
+async function adminDeleteUser(req, res) {
+  const { id } = req.params;
+  try {
+    const db = await getDatabase();
+    const user = await db.get('SELECT id, role FROM users WHERE id = ?', [id]);
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+    await db.run('DELETE FROM users WHERE id = ?', [id]);
+    res.json({ message: 'Xóa tài khoản thành viên thành công' });
+  } catch (error) {
+    console.error('Admin Delete User Error:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi xóa tài khoản' });
+  }
+}
+
+async function adminResetPassword(req, res) {
+  const { id } = req.params;
+  const { newPassword } = req.body;
+  const password = newPassword || '123456';
+  try {
+    const db = await getDatabase();
+    const user = await db.get('SELECT id FROM users WHERE id = ?', [id]);
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+    await db.run('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [passwordHash, id]);
+    res.json({ message: `Đặt lại mật khẩu thành công về: ${password}` });
+  } catch (error) {
+    console.error('Admin Reset Password Error:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi đặt lại mật khẩu' });
+  }
+}
+
+async function adminToggleUserStatus(req, res) {
+  const { id } = req.params;
+  try {
+    const db = await getDatabase();
+    const user = await db.get('SELECT id, status FROM users WHERE id = ?', [id]);
+    if (!user) {
+      return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+    }
+    const newStatus = user.status === 'active' ? 'locked' : 'active';
+    await db.run('UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [newStatus, id]);
+    res.json({ message: newStatus === 'locked' ? 'Kóa tài khoản thành công' : 'Mở khóa tài khoản thành công', status: newStatus });
+  } catch (error) {
+    console.error('Admin Toggle Status Error:', error);
+    res.status(500).json({ message: 'Lỗi máy chủ khi cập nhật trạng thái' });
+  }
+}
+
+async function refreshToken(req, res) {
+  const { token } = req.body;
+  if (!token) return res.status(401).json({ message: 'Missing refresh token' });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretkey');
+    const db = await getDatabase();
+    const user = await db.get('SELECT id, refresh_token FROM users WHERE id = ?', [decoded.id]);
+
+    if (!user || user.refresh_token !== token) {
+      return res.status(403).json({ message: 'Invalid refresh token' });
+    }
+
+    const newAccessToken = generateAccessToken(user.id);
+    const newRefreshToken = generateRefreshToken(user.id);
+
+    await db.run('UPDATE users SET refresh_token = ? WHERE id = ?', [newRefreshToken, user.id]);
+
+    res.json({
+      token: newAccessToken,
+      refreshToken: newRefreshToken
+    });
+  } catch (error) {
+    return res.status(403).json({ message: 'Invalid or expired refresh token' });
+  }
+}
+
+/**
+ * Client Google dùng chung (singleton) để cache public cert của Google giữa các lần đăng nhập,
+ * tránh mỗi request lại phải tải cert từ Google (gây chậm).
+ */
+let googleOAuthClient = null;
+function getGoogleOAuthClient(clientId) {
+  if (!googleOAuthClient) {
+    const { OAuth2Client } = require('google-auth-library');
+    googleOAuthClient = new OAuth2Client(clientId);
+  }
+  return googleOAuthClient;
+}
+
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timeout sau ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * Xử lý đăng nhập / đăng ký tự động qua Google OAuth trực tiếp (google-auth-library)
+ * Hỗ trợ cả credential (ID token JWT) hoặc accessToken từ @react-oauth/google
+ */
+async function loginWithGoogle(req, res) {
+  const { credential, idToken, accessToken, referralCode } = req.body;
+  const tokenToVerify = credential || idToken || accessToken;
+
+  if (!tokenToVerify) {
+    return res.status(400).json({ message: 'Thiếu mã xác thực token Google' });
+  }
+
+  try {
+    const db = await getDatabase();
+    let targetEmail = '';
+    let targetName = '';
+    let targetAvatar = null;
+
+    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+
+    // 1. Nếu gửi credential / idToken: Xác thực bằng OAuth2Client từ google-auth-library
+    if (credential || idToken) {
+      try {
+        const client = getGoogleOAuthClient(googleClientId);
+
+        const ticket = await withTimeout(client.verifyIdToken({
+          idToken: credential || idToken,
+          audience: googleClientId || undefined,
+        }), 6000, 'verifyIdToken');
+        const payload = ticket.getPayload();
+        if (payload) {
+          targetEmail = payload.email ? payload.email.trim().toLowerCase() : '';
+          targetName = payload.name || payload.given_name || (targetEmail ? targetEmail.split('@')[0] : '');
+          targetAvatar = payload.picture || null;
+        }
+      } catch (idTokenErr) {
+        console.warn('verifyIdToken warning:', idTokenErr.message);
+      }
+    }
+
+    // 2. Nếu gửi accessToken từ useGoogleLogin: Xác thực qua Google userinfo API
+    if (!targetEmail && accessToken) {
+      try {
+        const userinfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          signal: AbortSignal.timeout(6000)
+        });
+
+        if (userinfoRes.ok) {
+          const profile = await userinfoRes.json();
+          if (profile.email) {
+            targetEmail = profile.email.trim().toLowerCase();
+            targetName = profile.name || profile.given_name || targetEmail.split('@')[0];
+            targetAvatar = profile.picture || null;
+          }
+        } else {
+          console.warn('Google userinfo fetch status:', userinfoRes.status);
+        }
+      } catch (fetchErr) {
+        console.warn('Google userinfo fetch error:', fetchErr.message);
+      }
+    }
+
+    if (!targetEmail) {
+      return res.status(401).json({ message: 'Xác thực Google không thành công hoặc token đã hết hạn' });
+    }
+
+    // 3. Kiểm tra tài khoản đã tồn tại trong CSDL MySQL chưa
+    let user = await db.get('SELECT * FROM users WHERE LOWER(email) = ?', [targetEmail]);
+
+    if (user) {
+      if (user.status === 'banned') {
+        return res.status(403).json({ message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Admin.' });
+      }
+
+      // Cập nhật avatar nếu tài khoản chưa có
+      if (targetAvatar && (!user.avatar || user.avatar.trim() === '')) {
+        await db.run('UPDATE users SET avatar = ? WHERE id = ?', [targetAvatar, user.id]);
+        user.avatar = targetAvatar;
+      }
+
+      const appAccessToken = generateAccessToken(user.id);
+      const appRefreshToken = generateRefreshToken(user.id);
+      await db.run('UPDATE users SET refresh_token = ? WHERE id = ?', [appRefreshToken, user.id]);
+
+      delete user.password_hash;
+      delete user.refresh_token;
+
+      return res.json({
+        token: appAccessToken,
+        refreshToken: appRefreshToken,
+        user
+      });
+    }
+
+    // 4. Người dùng mới -> Tự động khởi tạo tài khoản User mới
+    const allUsrIds = await db.all("SELECT id FROM users WHERE id LIKE 'USR%'");
+    let maxUsrNum = 100;
+    for (const row of allUsrIds) {
+      const num = parseInt(String(row.id).substring(3), 10);
+      if (!isNaN(num) && num > maxUsrNum) maxUsrNum = num;
+    }
+    const nextId = `USR${maxUsrNum + 1}`;
+
+    // Kiểm tra mã giới thiệu (nếu có)
+    let validReferredBy = null;
+    if (referralCode) {
+      const referrer = await db.get('SELECT id FROM users WHERE id = ?', [referralCode.trim().toUpperCase()]);
+      if (referrer) {
+        validReferredBy = referrer.id;
+      }
+    }
+
+    const affiliateSubId = ensureUuid(nextId);
+    const salt = await bcrypt.genSalt(10);
+    const randomSecret = `GOOGLE_AUTH_${Date.now()}_${Math.random()}`;
+    const passwordHash = await bcrypt.hash(randomSecret, salt);
+    const finalName = targetName || targetEmail.split('@')[0];
+
+    await db.run(
+      `INSERT INTO users (id, name, email, password_hash, avatar, role, status, balance, signup_bonus, referred_by, affiliate_sub_id)
+       VALUES (?, ?, ?, ?, ?, 'user', 'active', ?, ?, ?, ?)`,
+      [
+        nextId,
+        finalName,
+        targetEmail,
+        passwordHash,
+        targetAvatar,
+        SIGNUP_BONUS_AMOUNT,
+        SIGNUP_BONUS_AMOUNT,
+        validReferredBy,
+        affiliateSubId
+      ]
+    );
+
+    // Gửi thông báo chào mừng +30.000đ
+    const notifId = `NT${Date.now()}`;
+    await db.run(
+      `INSERT INTO notifications (id, user_id, title, content, type)
+       VALUES (?, ?, '🎁 Tặng 30.000đ Quà Đăng Ký Mới!', 'Chào mừng bạn đã đăng ký thành công! Hệ thống đã cộng +30.000đ vào số dư ví của bạn. Mua sắm hoàn tiền hoặc giới thiệu bạn bè (+5.000đ/người khi hoàn thành đơn đầu) để đủ 50.000đ rút về ngân hàng ngay!', 'wallet')`,
+      [notifId, nextId]
+    );
+
+    if (validReferredBy) {
+      const refNotifId = `NT${Date.now()}_REF`;
+      await db.run(
+        `INSERT INTO notifications (id, user_id, title, content, type)
+         VALUES (?, ?, '🎉 Mời bạn bè thành công (+5.000đ Chờ duyệt)', ?, 'wallet')`,
+        [
+          refNotifId,
+          validReferredBy,
+          `Thành viên mới "${finalName}" vừa đăng ký qua mã giới thiệu của bạn! +5.000đ đã được cộng vào mục Chờ duyệt và sẽ tự động chuyển vào Số dư khả dụng ngay khi cấp dưới hoàn thành đơn hàng đầu tiên.`
+        ]
+      );
+    }
+
+    const newUser = await db.get('SELECT id, name, email, avatar, role, status, balance, signup_bonus, total_cashback, referred_by, affiliate_sub_id FROM users WHERE id = ?', [nextId]);
+    const appAccessToken = generateAccessToken(nextId);
+    const appRefreshToken = generateRefreshToken(nextId);
+    await db.run('UPDATE users SET refresh_token = ? WHERE id = ?', [appRefreshToken, nextId]);
+
+    return res.status(201).json({
+      token: appAccessToken,
+      refreshToken: appRefreshToken,
+      user: newUser
+    });
+  } catch (error) {
+    console.error('Google Auth Controller Error:', error);
+    return res.status(500).json({ message: 'Lỗi máy chủ khi đăng nhập bằng Google' });
+  }
+}
+
+module.exports = {
+  register,
+  login,
+  loginWithGoogle,
+  getProfile,
+  updateProfile,
+  getNotifications,
+  readNotifications,
+  adminGetUsers,
+  adminSyncBalances,
+  adminUpdateUser,
+  adminCreateUser,
+  adminDeleteUser,
+  adminResetPassword,
+  adminToggleUserStatus,
+  refreshToken
+};
+
