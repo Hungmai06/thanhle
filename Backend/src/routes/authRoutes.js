@@ -5,6 +5,7 @@ const {
   register,
   login,
   loginWithGoogle,
+  checkDeviceLimit,
   getProfile,
   updateProfile,
   getNotifications,
@@ -22,6 +23,7 @@ const {
 router.post('/register', register);
 router.post('/login', login);
 router.post('/google', loginWithGoogle);
+router.get('/check-device-limit', checkDeviceLimit);
 router.post('/refresh', refreshToken);
 router.get('/profile', protect, getProfile);
 router.put('/profile', protect, updateProfile);

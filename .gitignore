@@ -21,3 +21,8 @@ Thumbs.db
 .idea/
 .vscode/
 *.log
+
+# AI Agent & skills
+.agent/
+.agents/
+skills-lock.json

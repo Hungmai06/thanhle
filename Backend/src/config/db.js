@@ -236,6 +236,8 @@ async function initializeDatabase() {
         support_facebook VARCHAR(255) DEFAULT 'https://facebook.com/hoantienmuasam',
         shopee_affiliate_id VARCHAR(255) DEFAULT '173401900099',
         shopee_cookie_url VARCHAR(500) DEFAULT 'https://s.shopee.vn/an_redir',
+        shopee_guide_video_url VARCHAR(500) DEFAULT '',
+        tiktok_guide_video_url VARCHAR(500) DEFAULT '',
         addlivetag_api_key VARCHAR(255) DEFAULT '',
         lazada_affiliate_id VARCHAR(255) DEFAULT '',
         lazada_cookie_url VARCHAR(500) DEFAULT 'https://s.lazada.vn/s.an_redir',
@@ -254,6 +256,8 @@ async function initializeDatabase() {
 
     const mysqlAlterCols = [
       "ALTER TABLE system_settings ADD COLUMN shopee_cookie_url VARCHAR(500) DEFAULT 'https://s.shopee.vn/an_redir'",
+      "ALTER TABLE system_settings ADD COLUMN shopee_guide_video_url VARCHAR(500) DEFAULT ''",
+      "ALTER TABLE system_settings ADD COLUMN tiktok_guide_video_url VARCHAR(500) DEFAULT ''",
       "ALTER TABLE system_settings ADD COLUMN addlivetag_api_key VARCHAR(255) DEFAULT ''",
       "ALTER TABLE system_settings ADD COLUMN lazada_affiliate_id VARCHAR(255) DEFAULT ''",
       "ALTER TABLE system_settings ADD COLUMN lazada_cookie_url VARCHAR(500) DEFAULT 'https://s.lazada.vn/s.an_redir'",
@@ -296,6 +300,28 @@ async function initializeDatabase() {
       )
     `);
 
+    await wrapper.exec(`
+      CREATE TABLE IF NOT EXISTS devices (
+        id VARCHAR(255) PRIMARY KEY,
+        device_fingerprint_hash VARCHAR(255) UNIQUE NOT NULL,
+        first_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await wrapper.exec(`
+      CREATE TABLE IF NOT EXISTS device_registrations (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) UNIQUE NOT NULL,
+        device_id VARCHAR(255) NOT NULL,
+        registration_ip_hash VARCHAR(255) NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_devreg_device (device_id),
+        INDEX idx_devreg_user (user_id)
+      )
+    `);
+
     // Seed default settings for MySQL
     const [settingsCountRows] = await pool.query('SELECT COUNT(*) as count FROM system_settings');
     if (settingsCountRows[0].count === 0) {
@@ -306,31 +332,6 @@ async function initializeDatabase() {
       console.log('Seeded default system settings for MySQL.');
     }
     await pool.query("UPDATE system_settings SET website_name = 'Hoàn Tiền Mua Sắm' WHERE id = 1");
-
-    // Seed default users for MySQL
-    const [usersCountRows] = await pool.query('SELECT COUNT(*) as count FROM users');
-    if (usersCountRows[0].count === 0) {
-      const salt = await bcrypt.genSalt(10);
-      const defaultPasswordHash = await bcrypt.hash('password123', salt);
-
-      await pool.query(`
-        INSERT INTO users (id, name, email, password_hash, phone, avatar, role, status)
-        VALUES (
-          'ADM001', 'Admin Hoàn Tiền', 'admin@example.com', ?, '0988888888',
-          'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200', 'admin', 'active'
-        )
-      `, [defaultPasswordHash]);
-
-      await pool.query(`
-        INSERT INTO users (id, name, email, password_hash, phone, avatar, bank_name, account_number, account_holder, role, status)
-        VALUES (
-          'USR101', 'Nguyễn Văn A', 'user@example.com', ?, '0912345678',
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-          'Vietcombank', '1029384756', 'NGUYEN VAN A', 'user', 'active'
-        )
-      `, [defaultPasswordHash]);
-      console.log('Seeded default admin (admin@example.com) and user (user@example.com) with password: password123 for MySQL.');
-    }
 
     // Seed tài khoản admin thực tế (chỉ insert nếu email chưa tồn tại)
     const [existingAdmin] = await pool.query('SELECT id FROM users WHERE email = ?', ['khoahodrive0604@gmail.com']);
@@ -535,6 +536,8 @@ async function initializeDatabase() {
         support_facebook TEXT DEFAULT 'https://facebook.com/hoantienmuasam',
         shopee_affiliate_id TEXT DEFAULT '173401900099',
         shopee_cookie_url TEXT DEFAULT 'https://s.shopee.vn/an_redir',
+        shopee_guide_video_url TEXT DEFAULT '',
+        tiktok_guide_video_url TEXT DEFAULT '',
         addlivetag_api_key TEXT DEFAULT '',
         lazada_affiliate_id TEXT DEFAULT '',
         lazada_cookie_url TEXT DEFAULT 'https://s.lazada.vn/s.an_redir',
@@ -553,6 +556,8 @@ async function initializeDatabase() {
 
     const sqliteAlterCols = [
       "ALTER TABLE system_settings ADD COLUMN shopee_cookie_url TEXT DEFAULT 'https://s.shopee.vn/an_redir'",
+      "ALTER TABLE system_settings ADD COLUMN shopee_guide_video_url TEXT DEFAULT ''",
+      "ALTER TABLE system_settings ADD COLUMN tiktok_guide_video_url TEXT DEFAULT ''",
       "ALTER TABLE system_settings ADD COLUMN addlivetag_api_key TEXT DEFAULT ''",
       "ALTER TABLE system_settings ADD COLUMN lazada_affiliate_id TEXT DEFAULT ''",
       "ALTER TABLE system_settings ADD COLUMN lazada_cookie_url TEXT DEFAULT 'https://s.lazada.vn/s.an_redir'",
@@ -595,6 +600,31 @@ async function initializeDatabase() {
       )
     `);
 
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS devices (
+        id TEXT PRIMARY KEY,
+        device_fingerprint_hash TEXT UNIQUE NOT NULL,
+        first_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS device_registrations (
+        id TEXT PRIMARY KEY,
+        user_id TEXT UNIQUE NOT NULL,
+        device_id TEXT NOT NULL,
+        registration_ip_hash TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    try {
+      await db.exec('CREATE INDEX IF NOT EXISTS idx_devreg_device ON device_registrations (device_id)');
+      await db.exec('CREATE INDEX IF NOT EXISTS idx_devreg_user ON device_registrations (user_id)');
+    } catch (e) { }
+
     // Seed default settings for SQLite
     const settingsCount = await db.get('SELECT COUNT(*) as count FROM system_settings');
     if (settingsCount.count === 0) {
@@ -605,31 +635,6 @@ async function initializeDatabase() {
       console.log('Seeded default system settings for SQLite.');
     }
     await db.run("UPDATE system_settings SET website_name = 'Hoàn Tiền Mua Sắm' WHERE id = 1");
-
-    // Seed default admin and user for SQLite
-    const usersCount = await db.get('SELECT COUNT(*) as count FROM users');
-    if (usersCount.count === 0) {
-      const salt = await bcrypt.genSalt(10);
-      const defaultPasswordHash = await bcrypt.hash('password123', salt);
-
-      await db.run(`
-        INSERT INTO users (id, name, email, password_hash, phone, avatar, role, status)
-        VALUES (
-          'ADM001', 'Admin Hoàn Tiền', 'admin@example.com', ?, '0988888888',
-          'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=200', 'admin', 'active'
-        )
-      `, [defaultPasswordHash]);
-
-      await db.run(`
-        INSERT INTO users (id, name, email, password_hash, phone, avatar, bank_name, account_number, account_holder, role, status)
-        VALUES (
-          'USR101', 'Nguyễn Văn A', 'user@example.com', ?, '0912345678',
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-          'Vietcombank', '1029384756', 'NGUYEN VAN A', 'user', 'active'
-        )
-      `, [defaultPasswordHash]);
-      console.log('Seeded default admin (admin@example.com) and user (user@example.com) with password: password123 for SQLite.');
-    }
 
     // Seed tài khoản admin thực tế (chỉ insert nếu email chưa tồn tại)
     const existingRealAdmin = await db.get('SELECT id FROM users WHERE email = ?', ['khoahodrive0604@gmail.com']);

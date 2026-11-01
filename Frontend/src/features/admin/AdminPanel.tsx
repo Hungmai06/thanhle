@@ -6,7 +6,7 @@ import {
   LogOut, RefreshCw, Plus, Search,
   Filter, Check, X, Lock, Unlock, Trash2, Edit2, Download,
   Upload, BarChart3, FileSpreadsheet, HelpCircle,
-  Settings2, Activity, Eye, EyeOff, Key, ExternalLink
+  Settings2, Activity, Eye, EyeOff, Key, ExternalLink, Menu, PlayCircle
 } from 'lucide-react';
 import {
   Button, Card, CardContent, CardHeader, CardTitle, CardDescription,
@@ -75,6 +75,9 @@ export default function AdminPanel() {
   const [isSyncingBalances, setIsSyncingBalances] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'orders' | 'tiktok-orders' | 'tiktok-clicks' | 'withdrawals' | 'reconciliation' | 'settings'>('dashboard');
+
+  // Toggle state for 3-bar hamburger menu on the right
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // TikTok Clicks (click_logs) States
   const [tiktokClicks, setTiktokClicks] = useState<any[]>([]);
@@ -487,6 +490,8 @@ export default function AdminPanel() {
   const [sysAddlivetagApiKey, setSysAddlivetagApiKey] = useState(settings.addlivetagApiKey || "");
   const [showAddLiveKey, setShowAddLiveKey] = useState(false);
   const [isTestingKey, setIsTestingKey] = useState(false);
+  const [sysShopeeGuideVideoUrl, setSysShopeeGuideVideoUrl] = useState(settings.shopeeGuideVideoUrl || "");
+  const [sysTiktokGuideVideoUrl, setSysTiktokGuideVideoUrl] = useState(settings.tiktokGuideVideoUrl || "");
   const [sysLazadaAffiliateId, setSysLazadaAffiliateId] = useState(settings.lazadaAffiliateId || "");
   const [sysLazadaCookieUrl, setSysLazadaCookieUrl] = useState(settings.lazadaCookieUrl || "https://s.lazada.vn/s.an_redir");
   const [sysTiktokAffiliateId, setSysTiktokAffiliateId] = useState(settings.tiktokAffiliateId || "");
@@ -511,6 +516,8 @@ export default function AdminPanel() {
       setSysCashbackPercentage(settings.cashbackPercentage ?? 50);
       setSysShopeeAffiliateId(settings.shopeeAffiliateId || "173401900099");
       setSysShopeeCookieUrl(settings.shopeeCookieUrl || "https://s.shopee.vn/an_redir");
+      setSysShopeeGuideVideoUrl(settings.shopeeGuideVideoUrl || "");
+      setSysTiktokGuideVideoUrl(settings.tiktokGuideVideoUrl || "");
       setSysAddlivetagApiKey(settings.addlivetagApiKey || "");
       setSysLazadaAffiliateId(settings.lazadaAffiliateId || "");
       setSysLazadaCookieUrl(settings.lazadaCookieUrl || "https://s.lazada.vn/s.an_redir");
@@ -973,6 +980,8 @@ export default function AdminPanel() {
       cashbackPercentage: Number(sysCashbackPercentage) || 50,
       shopeeAffiliateId: sysShopeeAffiliateId,
       shopeeCookieUrl: sysShopeeCookieUrl,
+      shopeeGuideVideoUrl: sysShopeeGuideVideoUrl.trim(),
+      tiktokGuideVideoUrl: sysTiktokGuideVideoUrl.trim(),
       addlivetagApiKey: sysAddlivetagApiKey.trim(),
       lazadaAffiliateId: sysLazadaAffiliateId,
       lazadaCookieUrl: sysLazadaCookieUrl,
@@ -1214,82 +1223,248 @@ export default function AdminPanel() {
 
       {/* HEADER NAVBAR */}
       <header className="sticky top-0 z-30 glass-panel shadow-sm w-full py-4 px-6 flex items-center justify-between border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="gradient-bg p-2 rounded-[12px] text-white">
+        {/* LEFT: BRAND */}
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="gradient-bg p-2 rounded-[12px] text-white shadow-xs">
             <ShieldCheck className="h-5 w-5" />
           </div>
           <span className="font-bold text-text hidden sm:inline">Quản Trị Hệ Thống</span>
           <Badge className="bg-red-500 text-white border-none py-0.5 px-2.5 text-[10px]">Admin Panel</Badge>
         </div>
 
-        <div className="flex items-center gap-4">
+        {/* RIGHT: USER, LOGOUT & DẤU 3 GẠCH MENU (CHỈ HIỆN TRÊN ĐIỆN THOẠI) */}
+        <div className="flex items-center gap-2.5 sm:gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-sm">
+            <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs">
               {currentUser.name.charAt(0).toUpperCase()}
             </div>
             <div className="text-left hidden md:block">
               <p className="text-xs font-bold text-text leading-none">{currentUser.name}</p>
-              <span className="text-[10px] text-text-secondary font-medium block mt-0.5">Quyền hạn: Admin</span>
+              <span className="text-[10px] text-text-secondary font-medium block mt-0.5">Admin</span>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 border-border items-center ml-2"
-              onClick={() => { logout(); toast.info('Đã đăng xuất'); navigate('/'); }}
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              Thoát
-            </Button>
           </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 border-border items-center hidden sm:flex text-xs py-1.5"
+            onClick={() => { logout(); toast.info('Đã đăng xuất'); navigate('/'); }}
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Thoát
+          </Button>
+
+          {/* DẤU 3 GẠCH MENU - CHỈ HIỆN TRÊN ĐIỆN THOẠI (md:hidden) */}
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen(prev => !prev)}
+            title="Menu Quản Trị"
+            className="flex md:hidden items-center gap-2 px-3 py-2 rounded-xl bg-primary text-white hover:bg-[#E04810] shadow-xs transition-all cursor-pointer font-bold text-xs active:scale-95"
+            aria-label="Mở menu quản trị"
+          >
+            <Menu className="h-4.5 w-4.5" />
+            <span>Menu</span>
+            {(withdrawals.filter(w => w.status === 'pending').length + pendingShopeeOrdersCount + pendingTikTokOrdersCount) > 0 && (
+              <span className="flex h-4.5 min-w-4.5 px-1 items-center justify-center rounded-full bg-white text-primary text-[10px] font-black">
+                {withdrawals.filter(w => w.status === 'pending').length + pendingShopeeOrdersCount + pendingTikTokOrdersCount}
+              </span>
+            )}
+          </button>
         </div>
       </header>
 
+      {/* BODY WRAPPER: DESKTOP CỐ ĐỊNH SIDEBAR BÊN TRÁI + MOBILE DRAWER */}
       <div className="flex flex-1 flex-col md:flex-row relative">
 
-        {/* SIDEBAR NAVIGATION */}
-        <aside className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-border p-4 flex flex-col gap-1 md:h-[calc(100vh-73px)] sticky top-[73px] z-20 overflow-y-auto">
-          {[
-            { id: 'dashboard', icon: <BarChart3 className="h-4.5 w-4.5" />, label: 'Báo cáo thống kê' },
-            { id: 'users', icon: <Users className="h-4.5 w-4.5" />, label: 'Quản lý tài khoản' },
-            { id: 'orders', icon: <ShoppingBag className="h-4.5 w-4.5 text-[#EE4D2D]" />, label: 'Đơn hàng Shopee' },
-            { id: 'tiktok-orders', icon: <TikTokIcon className="h-4.5 w-4.5 text-slate-900" />, label: 'Đơn hàng TikTok' },
-            { id: 'tiktok-clicks', icon: <Activity className="h-4.5 w-4.5 text-slate-900" />, label: 'Click TikTok' },
-            { id: 'withdrawals', icon: <Wallet className="h-4.5 w-4.5" />, label: 'Quản lý rút tiền' },
-            { id: 'reconciliation', icon: <FileSpreadsheet className="h-4.5 w-4.5" />, label: 'Đối soát file Shopee' },
-            { id: 'settings', icon: <Settings2 className="h-4.5 w-4.5" />, label: 'Cài đặt hệ thống' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-3.5 px-4 py-3 text-sm font-semibold rounded-[12px] transition-all text-left ${activeTab === tab.id ? 'bg-primary/5 text-primary' : 'text-text-secondary hover:text-text hover:bg-border/20'}`}
-            >
-              {tab.icon}
-              <span className="flex-1">{tab.label}</span>
-              {tab.id === 'withdrawals' && withdrawals.filter(w => w.status === 'pending').length > 0 && (
-                <Badge variant="danger" className="py-0 px-2 text-[10px]">{withdrawals.filter(w => w.status === 'pending').length}</Badge>
-              )}
-              {tab.id === 'orders' && pendingShopeeOrdersCount > 0 && (
-                <Badge variant="info" className="py-0 px-2 text-[10px] bg-orange-50 text-[#EE4D2D] border border-orange-200">{pendingShopeeOrdersCount}</Badge>
-              )}
-              {tab.id === 'tiktok-orders' && pendingTikTokOrdersCount > 0 && (
-                <Badge variant="warning" className="py-0 px-2 text-[10px] bg-slate-900 text-white border-none">{pendingTikTokOrdersCount}</Badge>
-              )}
-            </button>
-          ))}
+        {/* 1. SIDEBAR CỐ ĐỊNH TRÊN MÁY TÍNH (BÊN GÓC TRÁI NHƯ CŨ, KHÔNG CẦN BẤM MỞ) */}
+        <aside className="hidden md:flex w-64 bg-white border-r border-border p-4 flex-col gap-1 sticky top-[73px] h-[calc(100vh-73px)] shrink-0 overflow-y-auto z-20">
+          <div className="px-3 pb-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            Danh mục quản trị
+          </div>
 
-          <div className="mt-auto pt-6 border-t border-border/40 hidden md:block">
+          <div className="flex flex-col gap-1">
+            {[
+              { id: 'dashboard', icon: <BarChart3 className="h-4.5 w-4.5 shrink-0" />, label: 'Báo cáo thống kê' },
+              { id: 'users', icon: <Users className="h-4.5 w-4.5 shrink-0" />, label: 'Quản lý tài khoản' },
+              { id: 'orders', icon: <ShoppingBag className="h-4.5 w-4.5 shrink-0 text-[#EE4D2D]" />, label: 'Đơn hàng Shopee' },
+              { id: 'tiktok-orders', icon: <TikTokIcon className="h-4.5 w-4.5 shrink-0 text-slate-900" />, label: 'Đơn hàng TikTok' },
+              { id: 'tiktok-clicks', icon: <Activity className="h-4.5 w-4.5 shrink-0 text-slate-900" />, label: 'Click TikTok' },
+              { id: 'withdrawals', icon: <Wallet className="h-4.5 w-4.5 shrink-0" />, label: 'Quản lý rút tiền' },
+              { id: 'reconciliation', icon: <FileSpreadsheet className="h-4.5 w-4.5 shrink-0" />, label: 'Đối soát file Shopee' },
+              { id: 'settings', icon: <Settings2 className="h-4.5 w-4.5 shrink-0" />, label: 'Cài đặt hệ thống' }
+            ].map(tab => {
+              const isActive = activeTab === tab.id;
+              const pendingWithdrawCount = tab.id === 'withdrawals' ? withdrawals.filter(w => w.status === 'pending').length : 0;
+              const pendingShopeeCount = tab.id === 'orders' ? pendingShopeeOrdersCount : 0;
+              const pendingTikTokCount = tab.id === 'tiktok-orders' ? pendingTikTokOrdersCount : 0;
+
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold rounded-xl transition-all duration-200 text-left cursor-pointer ${
+                    isActive
+                      ? 'bg-[#FFF2EB] text-primary shadow-xs border border-primary/25 font-bold'
+                      : 'text-slate-700 bg-white hover:bg-[#FFF2EB] hover:text-primary hover:shadow-xs border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`p-1 rounded-lg transition-colors duration-200 ${isActive ? 'text-primary' : 'text-slate-500'}`}>
+                      {tab.icon}
+                    </div>
+                    <span className={`text-sm tracking-tight ${isActive ? 'font-bold text-primary' : 'font-medium text-slate-700'}`}>
+                      {tab.label}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {pendingWithdrawCount > 0 && (
+                      <Badge variant="danger" className="py-0.5 px-2 text-[10px]">{pendingWithdrawCount}</Badge>
+                    )}
+                    {pendingShopeeCount > 0 && (
+                      <Badge variant="info" className="py-0.5 px-2 text-[10px] bg-orange-50 text-[#EE4D2D] border border-orange-200">{pendingShopeeCount}</Badge>
+                    )}
+                    {pendingTikTokCount > 0 && (
+                      <Badge variant="warning" className="py-0.5 px-2 text-[10px] bg-slate-900 text-white border-none">{pendingTikTokCount}</Badge>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-auto pt-4 border-t border-border">
             <button
               onClick={() => navigate('/')}
-              className="flex w-full items-center gap-3 px-4 py-3 text-xs font-bold text-text-secondary rounded-[12px] hover:bg-border/20 transition-all text-left"
+              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-xs font-semibold text-slate-600 rounded-xl hover:bg-slate-100 transition-colors text-left cursor-pointer"
             >
               <ShoppingBag className="h-4 w-4" />
-              Xem Trang Landing
+              <span>Xem Trang Landing</span>
             </button>
           </div>
         </aside>
 
-        {/* DASHBOARD CONTENT BODY */}
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-7xl">
+        {/* 2. SLIDE-OVER DRAWER TRÊN ĐIỆN THOẠI (CHỈ HIỆN TRÊN MOBILE KHI BẤM MENU) */}
+        <AnimatePresence>
+          {isMenuOpen && (
+            <div className="fixed inset-0 z-50 flex justify-start md:hidden">
+              {/* Backdrop làm mờ hậu cảnh */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsMenuOpen(false)}
+                className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+              />
+
+              {/* Panel menu trượt từ cạnh trái trên điện thoại */}
+              <motion.div
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="relative w-full max-w-xs bg-white h-full shadow-2xl flex flex-col justify-between z-10 border-r border-border"
+              >
+                {/* Header của menu mobile */}
+                <div className="p-4 border-b border-border flex items-center justify-between bg-slate-50/60">
+                  <div className="flex items-center gap-2">
+                    <div className="gradient-bg p-1.5 rounded-lg text-white shadow-2xs">
+                      <ShieldCheck className="h-4.5 w-4.5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-text">Menu Quản Trị</h3>
+                      <p className="text-[11px] text-text-secondary">Chọn mục để chuyển trang</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-text hover:bg-slate-200/60 transition-colors cursor-pointer"
+                    title="Đóng menu"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Danh sách các mục quản trị mobile */}
+                <div className="p-3 flex-1 overflow-y-auto flex flex-col gap-1.5">
+                  {[
+                    { id: 'dashboard', icon: <BarChart3 className="h-4.5 w-4.5 shrink-0" />, label: 'Báo cáo thống kê' },
+                    { id: 'users', icon: <Users className="h-4.5 w-4.5 shrink-0" />, label: 'Quản lý tài khoản' },
+                    { id: 'orders', icon: <ShoppingBag className="h-4.5 w-4.5 shrink-0 text-[#EE4D2D]" />, label: 'Đơn hàng Shopee' },
+                    { id: 'tiktok-orders', icon: <TikTokIcon className="h-4.5 w-4.5 shrink-0 text-slate-900" />, label: 'Đơn hàng TikTok' },
+                    { id: 'tiktok-clicks', icon: <Activity className="h-4.5 w-4.5 shrink-0 text-slate-900" />, label: 'Click TikTok' },
+                    { id: 'withdrawals', icon: <Wallet className="h-4.5 w-4.5 shrink-0" />, label: 'Quản lý rút tiền' },
+                    { id: 'reconciliation', icon: <FileSpreadsheet className="h-4.5 w-4.5 shrink-0" />, label: 'Đối soát file Shopee' },
+                    { id: 'settings', icon: <Settings2 className="h-4.5 w-4.5 shrink-0" />, label: 'Cài đặt hệ thống' }
+                  ].map(tab => {
+                    const isActive = activeTab === tab.id;
+                    const pendingWithdrawCount = tab.id === 'withdrawals' ? withdrawals.filter(w => w.status === 'pending').length : 0;
+                    const pendingShopeeCount = tab.id === 'orders' ? pendingShopeeOrdersCount : 0;
+                    const pendingTikTokCount = tab.id === 'tiktok-orders' ? pendingTikTokOrdersCount : 0;
+
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => {
+                          setActiveTab(tab.id as any);
+                          setIsMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3.5 py-3 text-xs font-semibold rounded-xl transition-all duration-200 text-left cursor-pointer ${
+                          isActive
+                            ? 'bg-[#FFF2EB] text-primary shadow-xs border border-primary/25 font-bold'
+                            : 'text-slate-700 bg-white hover:bg-[#FFF2EB] hover:text-primary hover:shadow-xs border border-transparent'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`p-1 rounded-lg transition-colors duration-200 ${isActive ? 'text-primary' : 'text-slate-500'}`}>
+                            {tab.icon}
+                          </div>
+                          <span className={`text-sm tracking-tight ${isActive ? 'font-bold text-primary' : 'font-medium text-slate-700'}`}>
+                            {tab.label}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          {pendingWithdrawCount > 0 && (
+                            <Badge variant="danger" className="py-0.5 px-2 text-[10px]">{pendingWithdrawCount}</Badge>
+                          )}
+                          {pendingShopeeCount > 0 && (
+                            <Badge variant="info" className="py-0.5 px-2 text-[10px] bg-orange-50 text-[#EE4D2D] border border-orange-200">{pendingShopeeCount}</Badge>
+                          )}
+                          {pendingTikTokCount > 0 && (
+                            <Badge variant="warning" className="py-0.5 px-2 text-[10px] bg-slate-900 text-white border-none">{pendingTikTokCount}</Badge>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Chân trang Menu mobile */}
+                <div className="p-4 border-t border-border bg-slate-50/80 flex flex-col gap-2">
+                  <button
+                    onClick={() => { navigate('/'); setIsMenuOpen(false); }}
+                    className="flex w-full items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold text-slate-700 bg-white border border-border rounded-xl hover:bg-slate-100 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    <ShoppingBag className="h-4 w-4" />
+                    Xem Trang Landing
+                  </button>
+                  <button
+                    onClick={() => { logout(); toast.info('Đã đăng xuất'); navigate('/'); }}
+                    className="flex w-full items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold text-danger bg-red-50/50 border border-red-200 rounded-xl hover:bg-red-100/60 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Đăng Xuất
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* 3. DASHBOARD MAIN CONTENT (BÊN PHẢI CỦA SIDEBAR CỐ ĐỊNH) */}
+        <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto w-full min-w-0">
 
           {/* TAB 1: DASHBOARD STATS */}
           {activeTab === 'dashboard' && (
@@ -1356,24 +1531,69 @@ export default function AdminPanel() {
               {/* TOP WIDGETS CARDS */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 {[
-                  { title: "Tổng thành viên", value: totalUsersCount, desc: "Tài khoản người dùng", color: "text-text", icon: <Users className="h-5 w-5 text-text-secondary" />, tab: 'users' },
-                  { title: statsPlatform === 'tiktok' ? "Đơn TikTok Shop" : statsPlatform === 'shopee' ? "Đơn Shopee" : "Tổng đơn hàng", value: totalOrdersCount, desc: statsPlatform === 'tiktok' ? "Đơn TikTok Shop" : statsPlatform === 'shopee' ? "Đơn sàn Shopee" : "Phát sinh trên hệ thống", color: "text-text", icon: <ShoppingBag className="h-5 w-5 text-text-secondary" />, tab: statsPlatform === 'tiktok' ? 'tiktok-orders' : 'orders' },
-                  { title: statsPlatform === 'tiktok' ? "Hoa hồng TikTok (100%)" : statsPlatform === 'shopee' ? "Hoa hồng Shopee (100%)" : "Tổng hoa hồng sàn (100%)", value: `${(adminStats?.summary?.platformTotalRevenue || 0).toLocaleString('vi-VN')}đ`, desc: "Tổng hoa hồng nhận từ sàn", color: "text-blue-600", icon: <Activity className="h-5 w-5 text-blue-600" /> },
-                  { title: "Số tiền còn lại (Lợi nhuận)", value: `${Math.round(adminStats?.summary?.remainingAfterPayout !== undefined ? adminStats.summary.remainingAfterPayout : Math.max(0, (adminStats?.summary?.platformTotalRevenue || 0) - (totalCashbackPaid || 0))).toLocaleString('vi-VN')}đ`, desc: "Sau khi trừ số tiền đã chi trả cho khách", color: "text-success", icon: <ShieldCheck className="h-5 w-5 text-success" /> },
-                  { title: "Tiền đã & chờ chi", value: `${(totalCashbackPaid).toLocaleString('vi-VN')}đ`, desc: `Chờ duyệt: ${(adminStats?.summary?.pendingWithdrawalsTotal || 0).toLocaleString('vi-VN')}đ`, color: "text-warning", icon: <Wallet className="h-5 w-5 text-warning" />, tab: 'withdrawals' }
+                  { 
+                    title: "Tổng thành viên", 
+                    value: totalUsersCount, 
+                    desc: "Tài khoản người dùng", 
+                    cardStyle: "border-blue-200/90 bg-gradient-to-br from-white via-white to-blue-50/40 hover:border-blue-400 hover:shadow-md",
+                    iconStyle: "bg-blue-50 text-blue-600 border border-blue-100",
+                    valueStyle: "text-slate-900",
+                    icon: <Users className="h-5 w-5" />, 
+                    tab: 'users' 
+                  },
+                  { 
+                    title: statsPlatform === 'tiktok' ? "Đơn TikTok Shop" : statsPlatform === 'shopee' ? "Đơn Shopee" : "Tổng đơn hàng", 
+                    value: totalOrdersCount, 
+                    desc: statsPlatform === 'tiktok' ? "Đơn TikTok Shop" : statsPlatform === 'shopee' ? "Đơn sàn Shopee" : "Phát sinh trên hệ thống", 
+                    cardStyle: "border-purple-200/90 bg-gradient-to-br from-white via-white to-purple-50/40 hover:border-purple-400 hover:shadow-md",
+                    iconStyle: "bg-purple-50 text-purple-600 border border-purple-100",
+                    valueStyle: "text-slate-900",
+                    icon: <ShoppingBag className="h-5 w-5" />, 
+                    tab: statsPlatform === 'tiktok' ? 'tiktok-orders' : 'orders' 
+                  },
+                  { 
+                    title: statsPlatform === 'tiktok' ? "Hoa hồng TikTok (100%)" : statsPlatform === 'shopee' ? "Hoa hồng Shopee (100%)" : "Tổng hoa hồng sàn (100%)", 
+                    value: `${(adminStats?.summary?.platformTotalRevenue || 0).toLocaleString('vi-VN')}đ`, 
+                    desc: "Tổng hoa hồng nhận từ sàn", 
+                    cardStyle: "border-sky-200/90 bg-gradient-to-br from-white via-white to-sky-50/40 hover:border-sky-400 hover:shadow-md",
+                    iconStyle: "bg-sky-50 text-sky-600 border border-sky-100",
+                    valueStyle: "text-sky-600",
+                    icon: <Activity className="h-5 w-5" /> 
+                  },
+                  { 
+                    title: "Số tiền còn lại (Lợi nhuận)", 
+                    value: `${Math.round(adminStats?.summary?.remainingAfterPayout !== undefined ? adminStats.summary.remainingAfterPayout : Math.max(0, (adminStats?.summary?.platformTotalRevenue || 0) - (totalCashbackPaid || 0))).toLocaleString('vi-VN')}đ`, 
+                    desc: "Sau khi trừ số tiền đã chi trả cho khách", 
+                    cardStyle: "border-emerald-200/90 bg-gradient-to-br from-white via-white to-emerald-50/40 hover:border-emerald-400 hover:shadow-md",
+                    iconStyle: "bg-emerald-50 text-emerald-600 border border-emerald-100",
+                    valueStyle: "text-emerald-600",
+                    icon: <ShieldCheck className="h-5 w-5" /> 
+                  },
+                  { 
+                    title: "Tiền đã & chờ chi", 
+                    value: `${(totalCashbackPaid).toLocaleString('vi-VN')}đ`, 
+                    desc: `Chờ duyệt: ${(adminStats?.summary?.pendingWithdrawalsTotal || 0).toLocaleString('vi-VN')}đ`, 
+                    cardStyle: "border-amber-200/90 bg-gradient-to-br from-white via-white to-amber-50/40 hover:border-amber-400 hover:shadow-md",
+                    iconStyle: "bg-amber-50 text-amber-600 border border-amber-100",
+                    valueStyle: "text-amber-600",
+                    icon: <Wallet className="h-5 w-5" />, 
+                    tab: 'withdrawals' 
+                  }
                 ].map((card, idx) => (
                   <Card 
                     key={idx} 
                     onClick={() => card.tab && setActiveTab(card.tab as any)}
-                    className={`border-border/50 relative overflow-hidden transition-all ${card.tab ? 'cursor-pointer hover:border-primary/50 hover:shadow-md' : ''}`}
+                    className={`relative overflow-hidden transition-all duration-200 border rounded-2xl ${card.cardStyle} ${card.tab ? 'cursor-pointer' : ''}`}
                   >
                     <CardHeader className="p-4 pb-1 flex flex-row items-center justify-between">
-                      <CardDescription className="font-bold text-text-secondary uppercase tracking-wider text-[9px]">{card.title}</CardDescription>
-                      {card.icon}
+                      <CardDescription className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">{card.title}</CardDescription>
+                      <span className={`p-2 rounded-xl flex items-center justify-center shrink-0 ${card.iconStyle}`}>
+                        {card.icon}
+                      </span>
                     </CardHeader>
                     <CardContent className="p-4 pt-1">
-                      <p className="text-xl font-black text-text mb-0.5">{card.value}</p>
-                      <p className="text-[10px] text-text-secondary font-medium">{card.desc}</p>
+                      <p className={`text-xl font-black mb-0.5 ${card.valueStyle}`}>{card.value}</p>
+                      <p className="text-[11px] text-slate-400 font-medium">{card.desc}</p>
                     </CardContent>
                   </Card>
                 ))}
@@ -1384,12 +1604,16 @@ export default function AdminPanel() {
                 {/* Shopee Card */}
                 <Card 
                   onClick={() => setStatsPlatform(statsPlatform === 'shopee' ? 'all' : 'shopee')}
-                  className={`border-border/60 transition-all cursor-pointer hover:shadow-md ${statsPlatform === 'shopee' ? 'ring-2 ring-[#EE4D2D] bg-orange-50/20' : 'bg-white'}`}
+                  className={`transition-all duration-200 cursor-pointer rounded-2xl border ${
+                    statsPlatform === 'shopee' 
+                      ? 'border-[#EE4D2D] ring-2 ring-[#EE4D2D]/30 bg-gradient-to-br from-orange-50/70 via-white to-orange-50/30 shadow-md' 
+                      : 'border-orange-200/90 bg-gradient-to-br from-white via-white to-orange-50/30 hover:border-orange-300 hover:shadow-md'
+                  }`}
                 >
-                  <CardContent className="p-4 flex flex-col gap-3">
+                  <CardContent className="p-5 flex flex-col gap-3.5">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <span className="p-2 bg-orange-100 text-[#EE4D2D] rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <span className="p-2.5 bg-orange-100 text-[#EE4D2D] rounded-xl shadow-xs border border-orange-200/50">
                           <ShopeeIcon className="w-5 h-5" />
                         </span>
                         <div>
@@ -1397,7 +1621,7 @@ export default function AdminPanel() {
                             <h4 className="font-bold text-sm text-text">Sàn Shopee</h4>
                             {statsPlatform === 'shopee' && <Badge className="bg-[#EE4D2D] text-white text-[9px] py-0 px-1.5">Đang lọc</Badge>}
                           </div>
-                          <p className="text-[10px] text-text-secondary font-medium">Đối soát file Excel / CSV định kỳ</p>
+                          <p className="text-[11px] text-text-secondary font-medium">Đối soát file Excel / CSV định kỳ</p>
                         </div>
                       </div>
                       <Badge variant="outline" className="border-orange-200 text-[#EE4D2D] bg-orange-50 font-black text-xs px-2.5 py-1">
@@ -1405,22 +1629,22 @@ export default function AdminPanel() {
                       </Badge>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/50 text-center">
-                      <div className="bg-bg/60 p-2 rounded-lg">
-                        <span className="text-[10px] text-text-secondary font-bold block">Hoa hồng sàn</span>
+                    <div className="grid grid-cols-3 gap-2.5 pt-2 border-t border-orange-100/80 text-center">
+                      <div className="bg-white/80 border border-blue-100/80 p-2.5 rounded-xl shadow-xs">
+                        <span className="text-[10px] text-slate-500 font-bold block mb-0.5">Hoa hồng sàn</span>
                         <span className="text-xs font-black text-blue-600">
                           {((adminStats?.platformBreakdown?.shopee?.revenue || 0)).toLocaleString('vi-VN')}đ
                         </span>
                       </div>
-                      <div className="bg-bg/60 p-2 rounded-lg">
-                        <span className="text-[10px] text-text-secondary font-bold block">Hoàn trả khách (50%)</span>
+                      <div className="bg-white/80 border border-orange-100/80 p-2.5 rounded-xl shadow-xs">
+                        <span className="text-[10px] text-slate-500 font-bold block mb-0.5">Hoàn trả khách (50%)</span>
                         <span className="text-xs font-black text-[#EE4D2D]">
                           {((adminStats?.platformBreakdown?.shopee?.cashback || 0)).toLocaleString('vi-VN')}đ
                         </span>
                       </div>
-                      <div className="bg-bg/60 p-2 rounded-lg">
-                        <span className="text-[10px] text-text-secondary font-bold block">Lợi nhuận giữ lại</span>
-                        <span className="text-xs font-black text-success">
+                      <div className="bg-white/80 border border-emerald-100/80 p-2.5 rounded-xl shadow-xs">
+                        <span className="text-[10px] text-slate-500 font-bold block mb-0.5">Lợi nhuận giữ lại</span>
+                        <span className="text-xs font-black text-emerald-600">
                           {((adminStats?.platformBreakdown?.shopee?.profit || 0)).toLocaleString('vi-VN')}đ
                         </span>
                       </div>
@@ -1431,12 +1655,16 @@ export default function AdminPanel() {
                 {/* TikTok Shop Card */}
                 <Card 
                   onClick={() => setStatsPlatform(statsPlatform === 'tiktok' ? 'all' : 'tiktok')}
-                  className={`border-border/60 transition-all cursor-pointer hover:shadow-md ${statsPlatform === 'tiktok' ? 'ring-2 ring-slate-900 bg-slate-50/50' : 'bg-white'}`}
+                  className={`transition-all duration-200 cursor-pointer rounded-2xl border ${
+                    statsPlatform === 'tiktok' 
+                      ? 'border-slate-800 ring-2 ring-slate-800/20 bg-gradient-to-br from-slate-100/80 via-white to-slate-50/50 shadow-md' 
+                      : 'border-slate-200/90 bg-gradient-to-br from-white via-white to-slate-50/70 hover:border-slate-400 hover:shadow-md'
+                  }`}
                 >
-                  <CardContent className="p-4 flex flex-col gap-3">
+                  <CardContent className="p-5 flex flex-col gap-3.5">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <span className="p-2 bg-slate-900 text-white rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <span className="p-2.5 bg-slate-900 text-white rounded-xl shadow-xs border border-slate-700">
                           <TikTokIcon className="w-5 h-5" />
                         </span>
                         <div>
@@ -1444,7 +1672,7 @@ export default function AdminPanel() {
                             <h4 className="font-bold text-sm text-text">Sàn TikTok Shop</h4>
                             {statsPlatform === 'tiktok' && <Badge className="bg-slate-900 text-white text-[9px] py-0 px-1.5">Đang lọc</Badge>}
                           </div>
-                          <p className="text-[10px] text-text-secondary font-medium">Đồng bộ tự động 100% qua API</p>
+                          <p className="text-[11px] text-text-secondary font-medium">Đồng bộ tự động 100% qua API</p>
                         </div>
                       </div>
                       <Badge variant="outline" className="border-slate-300 text-slate-900 bg-slate-100 font-black text-xs px-2.5 py-1">
@@ -1452,22 +1680,22 @@ export default function AdminPanel() {
                       </Badge>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/50 text-center">
-                      <div className="bg-bg/60 p-2 rounded-lg">
-                        <span className="text-[10px] text-text-secondary font-bold block">Hoa hồng sàn</span>
+                    <div className="grid grid-cols-3 gap-2.5 pt-2 border-t border-slate-200/70 text-center">
+                      <div className="bg-white/80 border border-blue-100/80 p-2.5 rounded-xl shadow-xs">
+                        <span className="text-[10px] text-slate-500 font-bold block mb-0.5">Hoa hồng sàn</span>
                         <span className="text-xs font-black text-blue-600">
                           {((adminStats?.platformBreakdown?.tiktok?.revenue || 0)).toLocaleString('vi-VN')}đ
                         </span>
                       </div>
-                      <div className="bg-bg/60 p-2 rounded-lg">
-                        <span className="text-[10px] text-text-secondary font-bold block">Hoàn trả khách (50%)</span>
+                      <div className="bg-white/80 border border-rose-100/80 p-2.5 rounded-xl shadow-xs">
+                        <span className="text-[10px] text-slate-500 font-bold block mb-0.5">Hoàn trả khách (50%)</span>
                         <span className="text-xs font-black text-[#EE4D2D]">
                           {((adminStats?.platformBreakdown?.tiktok?.cashback || 0)).toLocaleString('vi-VN')}đ
                         </span>
                       </div>
-                      <div className="bg-bg/60 p-2 rounded-lg">
-                        <span className="text-[10px] text-text-secondary font-bold block">Lợi nhuận giữ lại</span>
-                        <span className="text-xs font-black text-success">
+                      <div className="bg-white/80 border border-emerald-100/80 p-2.5 rounded-xl shadow-xs">
+                        <span className="text-[10px] text-slate-500 font-bold block mb-0.5">Lợi nhuận giữ lại</span>
+                        <span className="text-xs font-black text-emerald-600">
                           {((adminStats?.platformBreakdown?.tiktok?.profit || 0)).toLocaleString('vi-VN')}đ
                         </span>
                       </div>
@@ -2917,7 +3145,6 @@ export default function AdminPanel() {
                           className="w-full px-4 py-3 bg-white border border-border text-sm rounded-input outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all font-semibold text-primary font-bold"
                           required
                         />
-                        <p className="text-[10px] text-text-secondary">Ví dụ: 50% có nghĩa là hệ thống chia 50% tiền hoa hồng nhận được cho khách hàng.</p>
                       </div>
 
                       <div className="flex flex-col gap-1.5">
@@ -3020,34 +3247,39 @@ export default function AdminPanel() {
                                 )}
                               </button>
                             </div>
-
-                            <p className="text-[11px] text-muted-foreground leading-relaxed">
-                              Đăng nhập <strong>addlivetag.com</strong> → chọn menu <strong>API Key</strong> → bấm <strong>Tạo Key</strong>. Hệ thống dùng API này để tự động cào tên, ảnh đại diện, giá tiền và tỷ lệ hoa hồng Shopee khi người dùng tra cứu link.
-                            </p>
                           </div>
                         </div>
                       </div>
 
                       <div className="sm:col-span-2 pt-4 border-t border-border/40">
-                        <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-3">🟦 Tiếp thị liên kết Lazada</h3>
+                        <h3 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                          <PlayCircle className="w-4 h-4 text-red-500" />
+                          <span>Link Video YouTube Hướng Dẫn Hoàn Tiền (Shopee & TikTok Shop)</span>
+                        </h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-xs font-bold text-text/80">Lazada Affiliate ID</label>
+                            <label className="text-xs font-bold text-text/80 flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block"></span>
+                              Link Video YouTube Shopee
+                            </label>
                             <input
                               type="text"
-                              value={sysLazadaAffiliateId}
-                              onChange={(e) => setSysLazadaAffiliateId(e.target.value)}
+                              value={sysShopeeGuideVideoUrl}
+                              onChange={(e) => setSysShopeeGuideVideoUrl(e.target.value)}
                               className="w-full px-4 py-3 bg-white border border-border text-sm rounded-input outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all font-semibold font-mono"
-                              placeholder="Nhập mã LazAffiliate..."
+                              placeholder="https://www.youtube.com/watch?v=... hoặc https://youtu.be/..."
                             />
                           </div>
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-xs font-bold text-text/80">Link Cookie / Deeplink Lazada</label>
+                            <label className="text-xs font-bold text-text/80 flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-slate-900 inline-block"></span>
+                              Link Video YouTube TikTok Shop
+                            </label>
                             <input
                               type="text"
-                              value={sysLazadaCookieUrl}
-                              onChange={(e) => setSysLazadaCookieUrl(e.target.value)}
-                              placeholder="https://s.lazada.vn/s.an_redir"
+                              value={sysTiktokGuideVideoUrl}
+                              onChange={(e) => setSysTiktokGuideVideoUrl(e.target.value)}
+                              placeholder="https://www.youtube.com/watch?v=... hoặc https://youtu.be/..."
                               className="w-full px-4 py-3 bg-white border border-border text-sm rounded-input outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all font-semibold font-mono"
                             />
                           </div>
@@ -3117,12 +3349,9 @@ export default function AdminPanel() {
                                   {showRiohubKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                 </button>
                               </div>
-                              <p className="text-[11px] text-muted-foreground">
-                                Hệ thống tự động đính kèm Header <code>X-Riohub-Api-Key</code> và tham số <code>creator_username</code> vào các API khi gọi đến RioHub (không cần test key tại trang admin).
-                              </p>
                             </div>
 
-                            <div className="flex flex-col gap-1.5">
+                            <div className="flex flex-col gap-1.5 sm:col-span-2">
                               <label className="text-xs font-bold text-text/80 flex items-center justify-between">
                                 <span>Creator Username (Tài khoản TikTok Shop đã kết nối)</span>
                                 <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-bold uppercase">Bắt buộc</span>
@@ -3134,23 +3363,6 @@ export default function AdminPanel() {
                                 className="w-full px-4 py-2.5 bg-white border border-border text-xs rounded-input outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all font-mono font-semibold"
                                 placeholder="vd: hungrevieweverything"
                               />
-                              <span className="text-[10px] text-slate-500">
-                                Nhập username đã kết nối với tài khoản RioHub (ví dụ: <strong>hungrevieweverything</strong>). Key tạo ở tài khoản nào chỉ gọi được cho creator đã kết nối ở tài khoản đó.
-                              </span>
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-xs font-bold text-text/80">
-                                Webhook Secret <span className="text-slate-400 font-normal">(Xác thực X-Riohub-Signature)</span>
-                              </label>
-                              <input
-                                type="text"
-                                value={sysRiohubWebhookSecret}
-                                onChange={(e) => setSysRiohubWebhookSecret(e.target.value)}
-                                className="w-full px-4 py-2.5 bg-white border border-border text-xs rounded-input outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all font-mono"
-                                placeholder="Khóa bảo mật webhook (tùy chọn)..."
-                              />
-                              <span className="text-[10px] text-slate-500">Dùng để chống giả mạo request thông báo đơn từ RioHub.</span>
                             </div>
 
                             <div className="flex flex-col gap-1.5 sm:col-span-2">
@@ -3177,32 +3389,7 @@ export default function AdminPanel() {
                                   Sao chép
                                 </Button>
                               </div>
-                              <span className="text-[10px] text-slate-500">Cài đặt URL này vào mục Webhook/Postback trên RioHub để hệ thống tự động nhận đơn hàng (order.created, order.updated, order.refunded).</span>
                             </div>
-                          </div>
-                        </div>
-
-                        {/* FALLBACK COOKIE CONFIGURATION */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-xs font-bold text-text/80">TikTok Shop Affiliate ID (Dự phòng)</label>
-                            <input
-                              type="text"
-                              value={sysTiktokAffiliateId}
-                              onChange={(e) => setSysTiktokAffiliateId(e.target.value)}
-                              className="w-full px-4 py-3 bg-white border border-border text-sm rounded-input outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all font-semibold font-mono"
-                              placeholder="Nhập mã TikTok Affiliate..."
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-xs font-bold text-text/80">Link Cookie / Deeplink TikTok Shop (Dự phòng)</label>
-                            <input
-                              type="text"
-                              value={sysTiktokCookieUrl}
-                              onChange={(e) => setSysTiktokCookieUrl(e.target.value)}
-                              placeholder="https://vt.tiktok.com/an_redir"
-                              className="w-full px-4 py-3 bg-white border border-border text-sm rounded-input outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all font-semibold font-mono"
-                            />
                           </div>
                         </div>
                       </div>

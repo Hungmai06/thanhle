@@ -1216,7 +1216,7 @@ export default function UserDashboard() {
               {/* CASHBACK METRICS */}
               <div className="grid grid-cols-2 gap-4 bg-white border border-border p-4 rounded-input text-left">
                 <div>
-                  <p className="text-[10px] font-semibold text-text-secondary">Mức hoa hồng dự kiến (7%)</p>
+                  <p className="text-[10px] font-semibold text-text-secondary">Tiền hoàn dự kiến</p>
                   <p className="text-sm font-bold text-text mt-0.5">{Math.floor(selectedOrder.estimatedCashback).toLocaleString('vi-VN')}đ</p>
                 </div>
                 <div>

@@ -12,7 +12,7 @@ interface NavItem {
   name: string;
   path: string;
   altPaths?: string[];
-  icon: React.ReactNode;
+  icon: React.ComponentType<{ className?: string }>;
   badge?: string | null;
   badgeColor?: string;
 }
@@ -83,7 +83,7 @@ export default function PublicLayout() {
           name: 'Trang chủ',
           path: '/',
           altPaths: ['/shopee', '/tiktok'],
-          icon: <Home className="w-5 h-5 text-primary shrink-0" />,
+          icon: Home,
           badge: 'Shopee & TikTok',
           badgeColor: 'bg-gradient-to-r from-orange-500 via-rose-500 to-slate-900 text-white'
         }
@@ -95,13 +95,13 @@ export default function PublicLayout() {
         {
           name: 'Tra cứu đơn hàng',
           path: '/tracking',
-          icon: <Search className="w-4.5 h-4.5 text-blue-500 shrink-0" />,
+          icon: Search,
           badge: null
         },
         {
           name: 'Ví & Rút tiền',
           path: '/wallet',
-          icon: <Wallet className="w-4.5 h-4.5 text-emerald-500 shrink-0" />,
+          icon: Wallet,
           badge: currentUser && ((currentUser.balance ?? 0) > 0 || (userStats?.availableBalance ?? 0) > 0)
             ? `${(currentUser.balance || userStats?.availableBalance || 0).toLocaleString('vi-VN')} đ`
             : null,
@@ -110,13 +110,13 @@ export default function PublicLayout() {
         {
           name: 'Giới thiệu bạn bè',
           path: '/referral',
-          icon: <Users className="w-4.5 h-4.5 text-purple-500 shrink-0" />,
+          icon: Users,
           badge: 'Hoa hồng'
         },
         {
           name: 'Hỏi đáp & Hỗ trợ',
           path: '/support',
-          icon: <HelpCircle className="w-4.5 h-4.5 text-amber-500 shrink-0" />,
+          icon: HelpCircle,
           badge: null
         }
       ]
@@ -175,29 +175,32 @@ export default function PublicLayout() {
 
                 {group.items.map((item, iIdx) => {
                   const active = isLinkActive(item.path, item.altPaths);
+                  const Icon = item.icon;
                   return (
                     <NavLink
                       key={iIdx}
                       to={item.path}
-                      className={`group relative flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                      className={`group relative flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                         active
-                          ? 'bg-gradient-to-r from-orange-50 to-amber-50/30 text-primary border-l-4 border-primary shadow-xs pl-2.5'
-                          : 'text-text/80 hover:text-text hover:bg-slate-50'
+                          ? 'bg-[#FFF2EB] text-primary shadow-xs border border-primary/20 font-bold'
+                          : 'text-slate-700 bg-white hover:bg-[#FFF2EB] hover:text-primary hover:shadow-xs hover:-translate-y-0.5 border border-transparent hover:border-primary/15'
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`p-1 rounded-lg transition-transform group-hover:scale-110 ${active ? 'scale-105' : ''}`}>
-                          {item.icon}
+                        <div className={`p-1 rounded-lg transition-colors duration-200 ${active ? 'text-primary' : 'text-slate-500 group-hover:text-primary'}`}>
+                          <Icon className="w-4.5 h-4.5 shrink-0 transition-colors duration-200" />
                         </div>
-                        <span className="text-sm font-bold tracking-tight">
+                        <span className={`text-sm tracking-tight transition-colors duration-200 ${active ? 'font-bold text-primary' : 'font-medium text-slate-700 group-hover:text-primary'}`}>
                           {item.name}
                         </span>
                       </div>
 
                       {item.badge && (
                         <span
-                          className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-2xs ${
-                            item.badgeColor || 'bg-slate-100 text-slate-700'
+                          className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider transition-colors duration-200 ${
+                            active
+                              ? 'bg-primary text-white shadow-2xs'
+                              : item.badgeColor || 'bg-slate-100 text-slate-700 group-hover:bg-primary/15 group-hover:text-primary'
                           }`}
                         >
                           {item.badge}
@@ -382,25 +385,32 @@ export default function PublicLayout() {
                     </div>
                     {group.items.map((item, iIdx) => {
                       const active = isLinkActive(item.path, item.altPaths);
+                      const Icon = item.icon;
                       return (
                         <NavLink
                           key={iIdx}
                           to={item.path}
                           onClick={() => setMobileMenuOpen(false)}
-                          className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                          className={`group flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                             active
-                              ? 'bg-orange-50 text-primary border-l-4 border-primary pl-2.5'
-                              : 'text-text/80 hover:bg-slate-50'
+                              ? 'bg-[#FFF2EB] text-primary shadow-xs border border-primary/20 font-bold'
+                              : 'text-slate-700 bg-white hover:bg-[#FFF2EB] hover:text-primary active:bg-[#FFF2EB] active:text-primary border border-transparent'
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            {item.icon}
-                            <span className="text-sm font-bold">{item.name}</span>
+                            <div className={`p-1 rounded-lg transition-colors duration-200 ${active ? 'text-primary' : 'text-slate-500 group-hover:text-primary'}`}>
+                              <Icon className="w-4.5 h-4.5 shrink-0 transition-colors duration-200" />
+                            </div>
+                            <span className={`text-sm tracking-tight transition-colors duration-200 ${active ? 'font-bold text-primary' : 'font-medium text-slate-700 group-hover:text-primary'}`}>
+                              {item.name}
+                            </span>
                           </div>
                           {item.badge && (
                             <span
-                              className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase ${
-                                item.badgeColor || 'bg-slate-100 text-slate-700'
+                              className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider transition-colors duration-200 ${
+                                active
+                                  ? 'bg-primary text-white shadow-2xs'
+                                  : item.badgeColor || 'bg-slate-100 text-slate-700 group-hover:bg-primary/15 group-hover:text-primary'
                               }`}
                             >
                               {item.badge}

@@ -425,7 +425,7 @@ export default function TikTokPage() {
                           <div className="flex items-center justify-between gap-1 flex-wrap">
                             <p className="text-[11px] font-semibold text-[#FE2C55] uppercase flex items-center gap-1">
                               <Zap className="w-3 h-3" />
-                              <span>Tiền hoàn dự kiến (50%)</span>
+                              <span>Tiền hoàn dự kiến</span>
                             </p>
                             {checkedProduct.isObserved && (
                               <span className="text-[9px] bg-rose-100 text-rose-700 font-bold px-1.5 py-0.2 rounded-full">
@@ -440,15 +440,6 @@ export default function TikTokPage() {
                           </p>
                         </div>
                       </div>
-
-                      {checkedProduct.commissionAmountRange && (
-                        <div className="text-[11px] text-slate-500 mb-3 -mt-2 flex items-center gap-1">
-                          <span className="font-semibold text-slate-600">Hoa hồng sàn:</span>
-                          <span className="font-mono text-slate-700">{checkedProduct.commissionAmountRange} VND</span>
-                          <span className="text-slate-400">({checkedProduct.commissionRate}%) • Hoàn 50%</span>
-                        </div>
-                      )}
-
 
                       {/* Notice */}
                       <div className="flex items-start gap-2 text-xs text-slate-500 leading-relaxed mb-5">

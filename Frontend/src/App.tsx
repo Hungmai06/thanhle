@@ -85,7 +85,7 @@ function App() {
             }
           }).catch((err) => {
             console.error('Google Auth callback error:', err);
-            toast.error('Lỗi xác thực Google: ' + (err.message || 'Lỗi không xác định'));
+            toast.error(err.message || 'Lỗi xác thực Google không thành công');
           });
         }
       } catch (err) {

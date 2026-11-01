@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getDeviceFingerprint } from '../utils/fingerprint';
 
 export interface Order {
   id: string;
@@ -79,6 +80,8 @@ export interface SystemSettings {
   supportFacebook?: string;
   shopeeAffiliateId?: string;
   shopeeCookieUrl?: string;
+  shopeeGuideVideoUrl?: string;
+  tiktokGuideVideoUrl?: string;
   addlivetagApiKey?: string;
   lazadaAffiliateId?: string;
   lazadaCookieUrl?: string;
@@ -151,7 +154,7 @@ interface AppState {
     avatar?: string,
     referralCode?: string
   ) => Promise<UserProfile | null>;
-  register: (name: string, email: string, password: string, referralCode?: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string, referralCode?: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
   updateProfile: (profile: Partial<UserProfile>) => Promise<boolean>;
 
@@ -393,9 +396,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   loginWithGoogle: async (tokenOrOptions, email, name, avatar, referralCode) => {
     try {
+      const deviceFingerprint = await getDeviceFingerprint();
       let bodyPayload: any = {};
       if (typeof tokenOrOptions === 'object' && tokenOrOptions !== null) {
-        bodyPayload = tokenOrOptions;
+        bodyPayload = { ...tokenOrOptions, deviceFingerprint };
       } else {
         const tokenStr: string = typeof tokenOrOptions === 'string' ? tokenOrOptions : '';
         const isCredential = tokenStr.startsWith('eyJ');
@@ -405,7 +409,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           email,
           name,
           avatar,
-          referralCode
+          referralCode,
+          deviceFingerprint
         };
       }
 
@@ -415,8 +420,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         body: JSON.stringify(bodyPayload)
       }, 20000);
 
+      const data = await res.json().catch(() => ({}));
+
       if (res.ok) {
-        const data = await res.json();
         localStorage.setItem('token', data.token);
         if (data.refreshToken) {
           localStorage.setItem('refreshToken', data.refreshToken);
@@ -429,23 +435,29 @@ export const useAppStore = create<AppState>((set, get) => ({
         void get().initializeAuth();
         return data.user as UserProfile;
       }
+
+      if (data.message) {
+        throw new Error(data.message);
+      }
       return null;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login with Google API error:', error);
-      return null;
+      throw error;
     }
   },
 
   register: async (name, email, password, referralCode) => {
     try {
+      const deviceFingerprint = await getDeviceFingerprint();
       const res = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, referralCode })
+        body: JSON.stringify({ name, email, password, referralCode, deviceFingerprint })
       });
 
+      const data = await res.json().catch(() => ({}));
+
       if (res.ok) {
-        const data = await res.json();
         localStorage.setItem('token', data.token);
         if (data.refreshToken) {
           localStorage.setItem('refreshToken', data.refreshToken);
@@ -455,12 +467,19 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
         set({ currentUser: data.user, isAuthLoading: false });
         await get().initializeAuth();
-        return true;
+        return { success: true };
       }
-      return false;
-    } catch (error) {
+
+      return {
+        success: false,
+        message: data.message || 'Đăng ký không thành công. Vui lòng thử lại.'
+      };
+    } catch (error: any) {
       console.error('Register API error:', error);
-      return false;
+      return {
+        success: false,
+        message: error.message || 'Lỗi kết nối máy chủ khi đăng ký.'
+      };
     }
   },
 
@@ -756,6 +775,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     supportFacebook: "https://facebook.com/hoantienmuasam",
     shopeeAffiliateId: "173401900099",
     shopeeCookieUrl: "https://s.shopee.vn/an_redir",
+    shopeeGuideVideoUrl: "",
+    tiktokGuideVideoUrl: "",
     addlivetagApiKey: "",
     lazadaAffiliateId: "",
     lazadaCookieUrl: "https://s.lazada.vn/s.an_redir",

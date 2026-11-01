@@ -22,14 +22,14 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const baseStyle = "inline-flex items-center justify-center font-medium transition-all duration-200 focus:outline-none disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]";
     
     const variants = {
-      primary: "gradient-bg text-white hover:opacity-95 shadow-md shadow-primary/20",
-      secondary: "bg-secondary text-white hover:bg-secondary/90 shadow-md shadow-secondary/15",
-      accent: "bg-accent text-text hover:bg-accent/90 shadow-md shadow-accent/10",
-      outline: "border border-border bg-transparent text-text hover:bg-border/30",
-      ghost: "bg-transparent text-text hover:bg-border/30",
-      danger: "bg-danger text-white hover:bg-danger/90 shadow-md shadow-danger/10",
-      success: "bg-success text-white hover:bg-success/90 shadow-md shadow-success/10",
-      warning: "bg-warning text-text hover:bg-warning/90 shadow-md shadow-warning/10",
+      primary: "bg-primary hover:bg-[#E04810] text-white shadow-xs font-semibold cursor-pointer",
+      secondary: "bg-secondary hover:bg-orange-600 text-white shadow-xs font-semibold cursor-pointer",
+      accent: "bg-accent text-white hover:bg-amber-600 shadow-xs font-semibold cursor-pointer",
+      outline: "border border-border bg-white text-text hover:bg-slate-50 font-medium shadow-2xs cursor-pointer",
+      ghost: "bg-transparent text-text-secondary hover:text-text hover:bg-slate-100 font-medium cursor-pointer",
+      danger: "bg-danger text-white hover:bg-red-600 shadow-xs font-semibold cursor-pointer",
+      success: "bg-success text-white hover:bg-emerald-700 shadow-xs font-semibold cursor-pointer",
+      warning: "bg-warning text-white hover:bg-amber-600 shadow-xs font-semibold cursor-pointer",
     };
 
     const sizes = {
@@ -63,12 +63,12 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type = 'text', label, error, ...props }, ref) => {
     return (
       <div className="w-full flex flex-col gap-1.5">
-        {label && <label className="text-xs font-semibold text-text/80">{label}</label>}
+        {label && <label className="text-xs font-semibold text-text">{label}</label>}
         <input
           ref={ref}
           type={type}
           className={cn(
-            "w-full px-4 py-3 bg-white border border-border text-sm placeholder-text-secondary focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all rounded-input outline-none",
+            "w-full px-3.5 py-2.5 bg-white border border-border text-sm placeholder-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/10 transition-colors rounded-input outline-none",
             error && "border-danger focus:ring-danger/10",
             className
           )}
@@ -85,37 +85,37 @@ Input.displayName = 'Input';
 // CARD COMPONENT
 // ========================
 export const Card = ({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("bg-card border border-border/60 rounded-card card-shadow overflow-hidden transition-all duration-300", className)} {...props}>
+  <div className={cn("bg-card border border-border rounded-card shadow-soft overflow-hidden transition-colors duration-150", className)} {...props}>
     {children}
   </div>
 );
 
 export const CardHeader = ({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("p-6 pb-4 flex flex-col gap-1.5", className)} {...props}>
+  <div className={cn("p-5 sm:p-6 pb-3 flex flex-col gap-1.5", className)} {...props}>
     {children}
   </div>
 );
 
 export const CardTitle = ({ className, children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => (
-  <h3 className={cn("text-lg font-bold leading-none tracking-tight text-text", className)} {...props}>
+  <h3 className={cn("text-base sm:text-lg font-bold leading-snug tracking-tight text-text", className)} {...props}>
     {children}
   </h3>
 );
 
 export const CardDescription = ({ className, children, ...props }: React.HTMLAttributes<HTMLParagraphElement>) => (
-  <p className={cn("text-xs text-text-secondary", className)} {...props}>
+  <p className={cn("text-xs text-text-secondary leading-relaxed", className)} {...props}>
     {children}
   </p>
 );
 
 export const CardContent = ({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("p-6 pt-0", className)} {...props}>
+  <div className={cn("p-5 sm:p-6 pt-0", className)} {...props}>
     {children}
   </div>
 );
 
 export const CardFooter = ({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("p-6 pt-0 border-t border-border/40 mt-4 flex items-center justify-end gap-2", className)} {...props}>
+  <div className={cn("p-5 sm:p-6 pt-0 border-t border-border mt-4 flex items-center justify-end gap-2", className)} {...props}>
     {children}
   </div>
 );

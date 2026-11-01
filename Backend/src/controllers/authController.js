@@ -3,6 +3,11 @@ const bcrypt = require('bcryptjs');
 const { getDatabase } = require('../config/db');
 const { ensureUuid } = require('../services/shopeeService');
 const { recalculateUserBalances, SIGNUP_BONUS_AMOUNT } = require('../services/balanceService');
+const {
+  checkDeviceQuota,
+  recordUserRegistration,
+  DEVICE_LIMIT_MESSAGE
+} = require('../services/deviceService');
 
 
 function generateAccessToken(id) {
@@ -18,7 +23,7 @@ function generateRefreshToken(id) {
 }
 
 async function register(req, res) {
-  const { name, email, password, referralCode } = req.body;
+  const { name, email, password, referralCode, deviceFingerprint } = req.body;
 
   if (!name || !email || !password) {
     return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin: họ tên, email và mật khẩu' });
@@ -26,6 +31,16 @@ async function register(req, res) {
 
   try {
     const db = await getDatabase();
+
+    // 1. Kiểm tra giới hạn tối đa 3 tài khoản trên mỗi thiết bị
+    const quotaCheck = await checkDeviceQuota(db, deviceFingerprint, req);
+    if (!quotaCheck.allowed) {
+      return res.status(403).json({
+        message: DEVICE_LIMIT_MESSAGE,
+        limitExceeded: true,
+        maxAllowed: 3
+      });
+    }
 
     // Check if user already exists
     const userExists = await db.get('SELECT id FROM users WHERE email = ?', [email]);
@@ -73,6 +88,25 @@ async function register(req, res) {
         affiliateSubId
       ]
     );
+
+    // Ghi nhận thiết bị và liên kết tài khoản (bảo vệ giới hạn 3 tài khoản/thiết bị)
+    try {
+      await recordUserRegistration(db, {
+        userId: nextId,
+        clientFingerprint: deviceFingerprint,
+        req
+      });
+    } catch (deviceErr) {
+      if (deviceErr.code === 'DEVICE_LIMIT_EXCEEDED') {
+        await db.run('DELETE FROM users WHERE id = ?', [nextId]);
+        return res.status(403).json({
+          message: DEVICE_LIMIT_MESSAGE,
+          limitExceeded: true,
+          maxAllowed: 3
+        });
+      }
+      console.error('Record user device registration error:', deviceErr);
+    }
 
     // Create welcome notification with +30k bonus info
     const notifId = `NT${Date.now()}`;
@@ -591,7 +625,7 @@ function withTimeout(promise, ms, label) {
  * Hỗ trợ cả credential (ID token JWT) hoặc accessToken từ @react-oauth/google
  */
 async function loginWithGoogle(req, res) {
-  const { credential, idToken, accessToken, referralCode } = req.body;
+  const { credential, idToken, accessToken, referralCode, deviceFingerprint } = req.body;
   const tokenToVerify = credential || idToken || accessToken;
 
   if (!tokenToVerify) {
@@ -681,7 +715,17 @@ async function loginWithGoogle(req, res) {
       });
     }
 
-    // 4. Người dùng mới -> Tự động khởi tạo tài khoản User mới
+    // 4. Người dùng mới -> Kiểm tra giới hạn tối đa 3 tài khoản trên mỗi thiết bị
+    const quotaCheck = await checkDeviceQuota(db, deviceFingerprint, req);
+    if (!quotaCheck.allowed) {
+      return res.status(403).json({
+        message: DEVICE_LIMIT_MESSAGE,
+        limitExceeded: true,
+        maxAllowed: 3
+      });
+    }
+
+    // Tự động khởi tạo tài khoản User mới
     const allUsrIds = await db.all("SELECT id FROM users WHERE id LIKE 'USR%'");
     let maxUsrNum = 100;
     for (const row of allUsrIds) {
@@ -721,6 +765,25 @@ async function loginWithGoogle(req, res) {
       ]
     );
 
+    // Ghi nhận thiết bị và liên kết tài khoản cho Google Login
+    try {
+      await recordUserRegistration(db, {
+        userId: nextId,
+        clientFingerprint: deviceFingerprint,
+        req
+      });
+    } catch (deviceErr) {
+      if (deviceErr.code === 'DEVICE_LIMIT_EXCEEDED') {
+        await db.run('DELETE FROM users WHERE id = ?', [nextId]);
+        return res.status(403).json({
+          message: DEVICE_LIMIT_MESSAGE,
+          limitExceeded: true,
+          maxAllowed: 3
+        });
+      }
+      console.error('Record Google user device registration error:', deviceErr);
+    }
+
     // Gửi thông báo chào mừng +30.000đ
     const notifId = `NT${Date.now()}`;
     await db.run(
@@ -758,10 +821,28 @@ async function loginWithGoogle(req, res) {
   }
 }
 
+async function checkDeviceLimit(req, res) {
+  try {
+    const db = await getDatabase();
+    const fingerprint = req.query.fingerprint || req.headers['x-device-fingerprint'] || '';
+    const result = await checkDeviceQuota(db, fingerprint, req);
+    return res.json(result);
+  } catch (error) {
+    console.error('Check device limit error:', error);
+    return res.status(500).json({
+      allowed: true,
+      currentCount: 0,
+      maxAllowed: 3,
+      message: 'Lỗi kiểm tra giới hạn thiết bị'
+    });
+  }
+}
+
 module.exports = {
   register,
   login,
   loginWithGoogle,
+  checkDeviceLimit,
   getProfile,
   updateProfile,
   getNotifications,

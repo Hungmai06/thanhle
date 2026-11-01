@@ -73,12 +73,12 @@ export default function AuthPages() {
       return;
     }
 
-    const success = await register(name, email, password, referralCode);
-    if (success) {
+    const res = await register(name, email, password, referralCode);
+    if (res.success) {
       toast.success('🎁 Đăng ký tài khoản thành công! Bạn đã nhận được +30.000đ quà tân thủ vào ví!');
       navigate('/');
     } else {
-      toast.error('Email này đã được đăng ký trên hệ thống');
+      toast.error(res.message || 'Email này đã được đăng ký trên hệ thống');
     }
   };
 

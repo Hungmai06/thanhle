@@ -64,10 +64,10 @@ export default function AuthModal() {
     }
 
     setLoading(true);
-    const success = await register(name, email, password, referralCode);
+    const res = await register(name, email, password, referralCode);
     setLoading(false);
 
-    if (success) {
+    if (res.success) {
       toast.success('🎁 Đăng ký thành công! Bạn đã được cộng +30.000đ quà tân thủ vào ví!');
       closeAuthModal();
       // Reset form
@@ -77,7 +77,7 @@ export default function AuthModal() {
       setConfirmPassword('');
       setReferralCode('');
     } else {
-      toast.error('Email này đã được đăng ký trên hệ thống');
+      toast.error(res.message || 'Email này đã được đăng ký trên hệ thống');
     }
   };
 

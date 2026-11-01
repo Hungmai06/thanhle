@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, Button } from '../../components/ui/core';
 import { 
   Users, MousePointerClick, UserPlus, Clock, Wallet, 
-  RefreshCw, CheckCircle2, AlertCircle, ShoppingBag, Search, Gift, Sparkles
+  RefreshCw, CheckCircle2, AlertCircle, ShoppingBag, Search
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -178,42 +178,6 @@ export default function ReferralDashboardView({ onCopyLink }: ReferralDashboardV
 
   return (
     <div className="flex flex-col gap-6 w-full">
-      {/* RULE HIGHLIGHT STRIP — 3 QUYỀN LỢI NGẮN GỌN */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-gradient-to-r from-emerald-50/70 via-orange-50/70 to-rose-50/70 border border-orange-200/70 rounded-2xl p-3.5 shadow-sm">
-        <div className="flex items-center gap-3 bg-white/90 rounded-xl p-3 border border-emerald-100">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-sm">
-            <Gift className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Quyền lợi người mới</div>
-            <div className="text-sm font-black text-slate-900">Đăng ký nhận +30.000đ</div>
-            <div className="text-[11px] text-slate-500">Cộng ngay vào ví khi tạo tài khoản</div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 bg-white/90 rounded-xl p-3 border border-orange-100">
-          <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center shrink-0 shadow-sm">
-            <Clock className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-bold text-orange-600 uppercase tracking-wider">Thưởng mời 1 bạn</div>
-            <div className="text-sm font-black text-slate-900">Nhận +5.000đ / người</div>
-            <div className="text-[11px] text-slate-500">Chờ duyệt → Mở khóa khi xong đơn đầu</div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 bg-white/90 rounded-xl p-3 border border-rose-100">
-          <div className="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-sm">
-            <Sparkles className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-bold text-rose-600 uppercase tracking-wider">Thưởng 20% theo đơn</div>
-            <div className="text-sm font-black text-slate-900">+20% tiền hoàn của F1</div>
-            <div className="text-[11px] text-slate-500">VD: F1 được hoàn 5.000đ → Bạn nhận 1.000đ</div>
-          </div>
-        </div>
-      </div>
-
       {/* 4 TOP SUMMARY STATS CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* CARD 1: LƯỢT CLICK */}

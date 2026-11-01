@@ -189,7 +189,7 @@ export default function TrackingPage() {
           Lịch Sử <span className="gradient-text">Hoàn Tiền Đối Soát</span>
         </h1>
         <p className="text-sm md:text-base text-text-secondary">
-          Theo dõi minh bạch số dư, hoa hồng nhận được, số tiền đã rút và trạng thái hoàn tiền (50%) đơn Shopee & TikTok Shop.
+          Theo dõi minh bạch số dư, tiền hoàn nhận được, số tiền đã rút và trạng thái đơn Shopee & TikTok Shop.
         </p>
       </div>
 
@@ -414,8 +414,8 @@ export default function TrackingPage() {
                 <th className="py-3.5 px-3">Thời gian ghi nhận</th>
                 <th className="py-3.5 px-4">Sản phẩm</th>
                 <th className="py-3.5 px-3 text-right">Giá trị đơn</th>
-                <th className="py-3.5 px-3 text-right">Hoa hồng dự kiến (50%)</th>
-                <th className="py-3.5 px-3 text-right">Hoa hồng nhận được</th>
+                <th className="py-3.5 px-3 text-right">Tiền hoàn dự kiến</th>
+                <th className="py-3.5 px-3 text-right">Tiền hoàn nhận được</th>
                 <th className="py-3.5 px-3 text-center rounded-r-input">Trạng thái</th>
               </tr>
             </thead>

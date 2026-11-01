@@ -1,7 +1,7 @@
 import { useAppStore } from '../../store/appStore';
 import { Card, CardContent, CardHeader, CardTitle, Button } from '../../components/ui/core';
 import {
-  Users, Copy, Link2, Send, Gift, Clock, CheckCircle2,
+  Users, Copy, Link2, Send, Gift,
   Percent, ShieldCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import ReferralDashboardView from '../referral/ReferralDashboardView';
 
 export default function ReferralPage() {
-  const { currentUser } = useAppStore();
+  const { currentUser, settings } = useAppStore();
   const navigate = useNavigate();
 
   const referralLink = currentUser
@@ -81,7 +81,7 @@ export default function ReferralPage() {
                   <Users className="h-5 w-5" />
                 </div>
                 <div className="text-sm font-medium text-slate-700">
-                  <strong className="text-orange-600 font-black">Mời 1 người +5.000đ:</strong> Vào <em>Chờ duyệt</em>, mở khóa khi cấp dưới xong đơn đầu.
+                  <strong className="text-orange-600 font-black">Mời 1 người +5.000đ:</strong> Vào <em>Chờ duyệt</em>, khi cấp dưới hoàn thành đơn đầu tiên thì tiền thưởng sẽ được cộng vào ví.
                 </div>
               </div>
 
@@ -146,52 +146,6 @@ export default function ReferralPage() {
         </div>
       </div>
 
-      {/* 3-STEP HOW TO GET +5.000Đ INVITE BONUS */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <span className="px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-black uppercase tracking-wider">
-            Cách nhận +5.000đ thưởng mời bạn
-          </span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl p-5 border border-border/70 shadow-sm flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 font-black text-sm border border-orange-200">
-              1
-            </div>
-            <div>
-              <h3 className="text-sm font-black text-slate-900 mb-1">Bước 1: Chia sẻ link mời</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Gửi link hoặc mã giới thiệu cho bạn bè đăng ký tài khoản mới.
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-5 border border-amber-200/90 shadow-sm flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 font-black text-sm border border-amber-200">
-              <Clock className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-black text-slate-900 mb-1">Bước 2: Nhận +5.000đ chờ duyệt</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Bạn bè đăng ký thành công, hệ thống cộng ngay <strong className="text-amber-600">+5.000đ</strong> vào mục <strong>Chờ duyệt</strong>.
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-5 border border-emerald-200/90 shadow-sm flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 font-black text-sm border border-emerald-200">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-black text-slate-900 mb-1">Bước 3: Mở khóa +5.000đ vào ví</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Khi cấp dưới hoàn thành <strong>đơn hàng đầu tiên</strong>, <strong className="text-emerald-600">+5.000đ</strong> tự động duyệt cộng vào ví!
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* REFERRAL LINK & CODE CARD */}
       <Card className="border-orange-200/80 shadow-sm">
         <CardHeader className="pb-3">
@@ -247,30 +201,24 @@ export default function ReferralPage() {
               <div className="flex items-center gap-3">
                 <span className="text-xs font-bold text-text-secondary">Chia sẻ nhanh:</span>
                 <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => {
-                      if (!currentUser) { navigate('/auth?mode=register'); return; }
-                      const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}`;
-                      const win = window.open(shareUrl, '_blank');
-                      if (!win || win.closed || typeof win.closed === 'undefined') window.location.href = shareUrl;
-                    }} 
-                    className="px-3 py-1.5 rounded-full bg-blue-600 flex items-center gap-1.5 text-white text-xs font-bold hover:opacity-90 transition-opacity"
+                  <a 
+                    href={settings?.supportFacebook || 'https://facebook.com/hoantienmuasam'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-full bg-blue-600 flex items-center gap-1.5 text-white text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer shadow-2xs"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
                     Facebook
-                  </button>
-                  <button 
-                    onClick={() => {
-                      if (!currentUser) { navigate('/auth?mode=register'); return; }
-                      const shareUrl = `https://zalo.me/share?url=${encodeURIComponent(referralLink)}`;
-                      const win = window.open(shareUrl, '_blank');
-                      if (!win || win.closed || typeof win.closed === 'undefined') window.location.href = shareUrl;
-                    }} 
-                    className="px-3 py-1.5 rounded-full bg-sky-500 flex items-center gap-1.5 text-white text-xs font-bold hover:opacity-90 transition-opacity"
+                  </a>
+                  <a 
+                    href={settings?.supportZalo || 'https://zalo.me/g/hoantienmuasam'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-full bg-sky-500 flex items-center gap-1.5 text-white text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer shadow-2xs"
                   >
                     <Send className="h-3.5 w-3.5" />
                     Zalo
-                  </button>
+                  </a>
                 </div>
               </div>
             </div>
