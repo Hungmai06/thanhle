@@ -286,6 +286,42 @@ async function convertTikTokLink(req, res) {
       };
     }
 
+    // D2. Nếu người dùng đã đăng nhập, tự động lưu đơn chờ vào tiktok_orders để hiển thị ngay trong danh sách tra cứu
+    if (resolvedUserId) {
+      try {
+        const existingTikTok = await db.get('SELECT id FROM tiktok_orders WHERE id = ?', [clickId]);
+        if (!existingTikTok) {
+          const estCash = Math.floor(productInfo.estimatedCashback || 0);
+          const pPrice = Math.floor(productInfo.price || 0);
+          const pName = productInfo.name || 'Sản phẩm TikTok Shop';
+          const pImg = productInfo.image || '';
+          const comm = Math.floor(productInfo.estimatedCommission || (estCash * 2));
+
+          await db.run(
+            `INSERT INTO tiktok_orders (
+              id, user_id, click_id, product_name, product_image,
+              order_amount, estimated_cashback, real_cashback, tiktok_commission,
+              status, sub_id, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 'pending', ?, ?)`,
+            [
+              clickId,
+              resolvedUserId,
+              clickId,
+              pName,
+              pImg,
+              pPrice,
+              estCash,
+              comm,
+              subId,
+              'Đơn hàng TikTok Shop (Chờ sàn đối soát)'
+            ]
+          );
+        }
+      } catch (saveErr) {
+        console.warn('Lỗi lưu đơn pending TikTok:', saveErr.message);
+      }
+    }
+
     return res.json({
       success: true,
       affiliateLink,
@@ -473,6 +509,29 @@ async function handleTikTokWebhook(req, res) {
     // Kiểm tra đơn hàng đã tồn tại chưa
     const existingOrder = await db.get('SELECT id, status FROM tiktok_orders WHERE id = ?', [orderId]);
 
+    // Tìm đơn chờ (pending click) trước đó để nâng cấp thành đơn thật
+    let pendingOrder = null;
+    if (!existingOrder) {
+      if (targetClickId) {
+        pendingOrder = await db.get(
+          "SELECT id, user_id FROM tiktok_orders WHERE (click_id = ? OR id = ?) AND status = 'pending'",
+          [targetClickId, targetClickId]
+        );
+      }
+      if (!pendingOrder && subId) {
+        pendingOrder = await db.get(
+          "SELECT id, user_id FROM tiktok_orders WHERE sub_id = ? AND status = 'pending'",
+          [subId]
+        );
+      }
+      if (!pendingOrder && targetUserId) {
+        pendingOrder = await db.get(
+          "SELECT id, user_id FROM tiktok_orders WHERE user_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1",
+          [targetUserId]
+        );
+      }
+    }
+
     if (existingOrder) {
       await db.run(
         `UPDATE tiktok_orders
@@ -486,6 +545,42 @@ async function handleTikTokWebhook(req, res) {
         [orderStatus, orderAmount, orderAmount, finalCommission, finalCommission, estimatedCashback, realCashback, orderId]
       );
       console.log(`[TikTok Webhook] Đã cập nhật trạng thái đơn ${orderId} -> ${orderStatus} (Hoàn dự kiến: ${estimatedCashback}, Thực nhận: ${realCashback})`);
+    } else if (pendingOrder) {
+      await db.run(
+        `UPDATE tiktok_orders
+         SET id = ?,
+             user_id = COALESCE(?, user_id),
+             click_id = COALESCE(?, click_id),
+             product_name = COALESCE(NULLIF(?, ''), product_name),
+             product_image = COALESCE(NULLIF(?, ''), product_image),
+             order_amount = CASE WHEN ? > 0 THEN ? ELSE order_amount END,
+             tiktok_commission = CASE WHEN ? > 0 THEN ? ELSE tiktok_commission END,
+             estimated_cashback = ?,
+             real_cashback = ?,
+             status = ?,
+             sub_id = COALESCE(NULLIF(?, ''), sub_id),
+             notes = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [
+          orderId,
+          targetUserId || pendingOrder.user_id,
+          targetClickId,
+          productName,
+          productImage,
+          orderAmount,
+          orderAmount,
+          finalCommission,
+          finalCommission,
+          estimatedCashback,
+          realCashback,
+          orderStatus,
+          subId,
+          `TikTok Shop: ${orderStatus} | SubID: ${subId}`,
+          pendingOrder.id
+        ]
+      );
+      console.log(`[TikTok Webhook] Đã cập nhật đơn chờ ${pendingOrder.id} -> mã thật ${orderId} (${orderStatus})`);
     } else {
       await db.run(
         `INSERT INTO tiktok_orders (
@@ -808,6 +903,29 @@ async function processTikTokOrders(db, orderList = []) {
     const productName = item.product_name || 'Đơn hàng TikTok Shop';
     const productImage = item.image_url || item.product_image || '';
 
+    // Tìm đơn chờ (pending click) trước đó để nâng cấp thành đơn thật
+    let pendingToUpdate = null;
+    if (!existing) {
+      if (clickId) {
+        pendingToUpdate = await db.get(
+          "SELECT id, user_id FROM tiktok_orders WHERE (click_id = ? OR id = ?) AND status = 'pending'",
+          [clickId, clickId]
+        );
+      }
+      if (!pendingToUpdate && subId) {
+        pendingToUpdate = await db.get(
+          "SELECT id, user_id FROM tiktok_orders WHERE sub_id = ? AND status = 'pending'",
+          [subId]
+        );
+      }
+      if (!pendingToUpdate && userId) {
+        pendingToUpdate = await db.get(
+          "SELECT id, user_id FROM tiktok_orders WHERE user_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1",
+          [userId]
+        );
+      }
+    }
+
     if (existing) {
       await db.run(
         `UPDATE tiktok_orders
@@ -839,6 +957,42 @@ async function processTikTokOrders(db, orderList = []) {
           subId,
           `TikTok Shop: ${settlementStat || orderStatus} | SubID: ${subId}`,
           orderId
+        ]
+      );
+      updatedCount++;
+    } else if (pendingToUpdate) {
+      await db.run(
+        `UPDATE tiktok_orders
+         SET id = ?,
+             user_id = COALESCE(?, user_id),
+             click_id = COALESCE(?, click_id),
+             product_name = COALESCE(NULLIF(?, ''), product_name),
+             product_image = COALESCE(NULLIF(?, ''), product_image),
+             order_amount = CASE WHEN ? > 0 THEN ? ELSE order_amount END,
+             status = ?,
+             real_cashback = ?,
+             estimated_cashback = ?,
+             tiktok_commission = CASE WHEN ? > 0 THEN ? ELSE tiktok_commission END,
+             sub_id = COALESCE(NULLIF(?, ''), sub_id),
+             notes = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [
+          orderId,
+          userId || pendingToUpdate.user_id,
+          clickId,
+          productName,
+          productImage,
+          orderAmount,
+          orderAmount,
+          orderStatus,
+          realCashback,
+          estimatedCashback,
+          finalCommission,
+          finalCommission,
+          subId,
+          `TikTok Shop: ${settlementStat || orderStatus} | SubID: ${subId}`,
+          pendingToUpdate.id
         ]
       );
       updatedCount++;

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingCart, Wallet, Bell, Heart,
   ArrowUpRight, LifeBuoy, Settings, LogOut, Package, Clock,
-  CheckCircle2, XCircle, AlertTriangle, Coins, Upload,
+  CheckCircle2, AlertTriangle, Coins, Upload,
   Check, ShieldCheck, ChevronRight,
   FileText, Landmark, Users, Copy, Send, Link2
 } from 'lucide-react';
@@ -20,6 +20,7 @@ import {
   PieChart, Pie, Cell, Legend
 } from 'recharts';
 import ReferralDashboardView from '../referral/ReferralDashboardView';
+import { OrderExistenceBadge } from '../../utils/orderExistence';
 
 interface ReferralStats {
   clicks: number;
@@ -449,15 +450,12 @@ export default function UserDashboard() {
                               {Math.floor(order.estimatedCashback).toLocaleString('vi-VN')}đ
                             </TableCell>
                             <TableCell className="text-center whitespace-nowrap">
-                              {order.status === 'approved' || order.status === 'paid' ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs">
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Tồn tại
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-600 border border-rose-200 shadow-xs">
-                                  <XCircle className="w-3 h-3 text-rose-500" /> Không
-                                </span>
-                              )}
+                              <OrderExistenceBadge
+                                status={order.status}
+                                createdTime={order.createdTime}
+                                id={order.id}
+                                size="sm"
+                              />
                             </TableCell>
                             <TableCell>{getStatusBadge(order.status)}</TableCell>
                             <TableCell className="text-xs text-text-secondary font-medium">{order.createdTime}</TableCell>
@@ -583,15 +581,11 @@ export default function UserDashboard() {
                                 {order.realCashback ? `${Math.floor(order.realCashback).toLocaleString('vi-VN')}đ` : '-'}
                               </TableCell>
                               <TableCell className="text-center whitespace-nowrap">
-                                {order.status === 'approved' || order.status === 'paid' ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Tồn tại
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 shadow-xs">
-                                    <XCircle className="w-3.5 h-3.5 text-rose-500" /> Không
-                                  </span>
-                                )}
+                                <OrderExistenceBadge
+                                  status={order.status}
+                                  createdTime={order.createdTime}
+                                  id={order.id}
+                                />
                               </TableCell>
                               <TableCell>{getStatusBadge(order.status)}</TableCell>
                               <TableCell className="text-xs text-text-secondary font-medium">{order.createdTime}</TableCell>

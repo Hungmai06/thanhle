@@ -35,8 +35,7 @@ async function logClick(req, res) {
     const amount = Math.floor(Number(orderAmount) || 100000);
     const cashback = Number(estimatedCashback) ? Math.floor(Number(estimatedCashback)) : Math.floor(amount * 0.035);
 
-    // Click TikTok chỉ lưu ở click_logs (tab "Click TikTok" của admin), không tạo đơn ở bảng Shopee/TikTok.
-    // Đơn TikTok thật sẽ do RioHub webhook/sync đưa vào tiktok_orders.
+    // Lưu đơn chờ vào bảng đơn hàng (Shopee hoặc TikTok) để người dùng tra cứu được ngay
     const isTikTok = String(req.body.platform || '').toLowerCase() === 'tiktok' || /^TT\d/.test(String(clickId));
 
     try {
@@ -44,12 +43,41 @@ async function logClick(req, res) {
         if (req.body.subId) {
           await db.run('UPDATE click_logs SET sub_id = COALESCE(sub_id, ?) WHERE id = ?', [req.body.subId, clickId]);
         }
+        const existingTikTok = await db.get('SELECT id FROM tiktok_orders WHERE id = ?', [clickId]);
+        if (!existingTikTok) {
+          await db.run(
+            `INSERT INTO tiktok_orders (
+              id, user_id, click_id, product_name, product_image,
+              order_amount, estimated_cashback, real_cashback, tiktok_commission,
+              status, sub_id, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 'pending', ?, ?)`,
+            [
+              clickId,
+              userId,
+              clickId,
+              name,
+              img,
+              amount,
+              cashback,
+              cashback * 2,
+              finalSubId,
+              'Đơn hàng TikTok Shop (Chờ sàn đối soát)'
+            ]
+          );
+        }
       } else {
-        await db.run(
-          `INSERT INTO orders (id, user_id, click_id, product_name, product_image, order_amount, estimated_cashback, status, shop_id, item_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
-          [clickId, userId, clickId, name, img, amount, cashback, finalShopId, finalItemId]
-        );
+        const existingShopee = await db.get('SELECT id FROM orders WHERE id = ?', [clickId]);
+        if (!existingShopee) {
+          await db.run(
+            `INSERT INTO orders (id, user_id, click_id, product_name, product_image, order_amount, estimated_cashback, status, shop_id, item_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+            [clickId, userId, clickId, name, img, amount, cashback, finalShopId, finalItemId]
+          );
+        }
+      }
+
+      if (userId) {
+        await recalculateUserBalances(db, [userId]);
       }
     } catch (oErr) {
       console.warn('Order insertion warning on click:', oErr.message);

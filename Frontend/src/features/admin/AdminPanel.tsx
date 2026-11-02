@@ -6,8 +6,7 @@ import {
   LogOut, RefreshCw, Plus, Search,
   Filter, Check, X, Lock, Unlock, Trash2, Edit2, Download,
   Upload, BarChart3, FileSpreadsheet, HelpCircle,
-  Settings2, Activity, Eye, EyeOff, Key, ExternalLink, Menu, PlayCircle,
-  CheckCircle2, XCircle
+  Settings2, Activity, Eye, EyeOff, Key, ExternalLink, Menu, PlayCircle
 } from 'lucide-react';
 import {
   Button, Card, CardContent, CardHeader, CardTitle, CardDescription,
@@ -17,6 +16,7 @@ import {
 import { useAppStore } from '../../store/appStore';
 import type { Order, UserProfile } from '../../store/appStore';
 import { toast } from 'sonner';
+import { OrderExistenceBadge } from '../../utils/orderExistence';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip,
   BarChart, Bar, Legend, Cell
@@ -2293,15 +2293,11 @@ export default function AdminPanel() {
                                 {o.createdTime ? o.createdTime.substring(0, 16) : '-'}
                               </TableCell>
                               <TableCell className="text-center whitespace-nowrap">
-                                {o.status === 'approved' || o.status === 'paid' ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Tồn tại
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 shadow-xs">
-                                    <XCircle className="w-3.5 h-3.5 text-rose-500" /> Không
-                                  </span>
-                                )}
+                                <OrderExistenceBadge
+                                  status={o.status}
+                                  createdTime={o.createdTime}
+                                  id={o.id}
+                                />
                               </TableCell>
                               <TableCell>
                                 {o.status === 'pending' && <Badge variant="info">Đang chờ xử lý</Badge>}
@@ -2609,15 +2605,11 @@ export default function AdminPanel() {
                                 {order.createdTime ? String(order.createdTime).substring(0, 16) : '-'}
                               </TableCell>
                               <TableCell className="text-center whitespace-nowrap">
-                                {order.status === 'approved' || order.status === 'paid' ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Tồn tại
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 shadow-xs">
-                                    <XCircle className="w-3.5 h-3.5 text-rose-500" /> Không
-                                  </span>
-                                )}
+                                <OrderExistenceBadge
+                                  status={order.status}
+                                  createdTime={order.createdTime}
+                                  id={order.id}
+                                />
                               </TableCell>
                               <TableCell>
                                 {order.status === 'approved' && <Badge variant="success">Hoàn thành</Badge>}

@@ -4,10 +4,10 @@ import { useAppStore } from '../../store/appStore';
 import type { Order } from '../../store/appStore';
 import { 
   Search, Lock, ShoppingBag, 
-  TrendingUp, Wallet, Clock, Coins, Landmark,
-  CheckCircle2, XCircle
+  TrendingUp, Wallet, Clock, Coins, Landmark
 } from 'lucide-react';
 import { Button, Card, CardContent, Badge } from '../../components/ui/core';
+import { OrderExistenceBadge } from '../../utils/orderExistence';
 
 const TikTokIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -478,15 +478,11 @@ export default function TrackingPage() {
                         )}
                       </td>
                       <td className="py-4 px-3 text-center whitespace-nowrap">
-                        {isApproved ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Tồn tại
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 shadow-xs">
-                            <XCircle className="w-3.5 h-3.5 text-rose-500" /> Không
-                          </span>
-                        )}
+                        <OrderExistenceBadge
+                          status={order.status}
+                          createdTime={order.createdTime}
+                          id={order.id}
+                        />
                       </td>
                       <td className="py-4 px-3 text-center whitespace-nowrap">{getStatusBadge(order.status)}</td>
                     </tr>

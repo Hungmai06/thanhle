@@ -553,6 +553,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   addOrder: async (order) => {
     // Record click log & persist pending order in DB
     try {
+      const platform = (order as any).platform || ((order.id && order.id.startsWith('TT')) ? 'tiktok' : 'shopee');
       await fetch(`${API_BASE}/orders/click-log`, {
         method: 'POST',
         headers: getHeaders(),
@@ -566,11 +567,14 @@ export const useAppStore = create<AppState>((set, get) => ({
           estimatedCashback: order.estimatedCashback,
           userId: order.userId,
           shopId: order.shopId || '',
-          itemId: order.itemId || ''
+          itemId: order.itemId || '',
+          platform
         })
       });
-      // Visual feedback in local UI
-      set((state) => ({ orders: [order, ...state.orders] }));
+      // Visual feedback in local UI & sync state
+      const orderWithPlatform = { ...order, platform };
+      set((state) => ({ orders: [orderWithPlatform as any, ...state.orders] }));
+      get().fetchUserOrders().catch(() => {});
     } catch (error) {
       console.error('Click log error:', error);
     }

@@ -271,7 +271,7 @@ async function initializeDatabase() {
     ];
 
     for (const alterQuery of mysqlAlterCols) {
-      try { await wrapper.exec(alterQuery); } catch (e) {}
+      try { await wrapper.exec(alterQuery); } catch (e) { }
     }
 
     await wrapper.exec(`
@@ -353,7 +353,7 @@ async function initializeDatabase() {
       await wrapper.run('UPDATE users SET balance = FLOOR(balance) WHERE balance IS NOT NULL');
       await wrapper.run('UPDATE users SET total_cashback = FLOOR(total_cashback) WHERE total_cashback IS NOT NULL');
       await wrapper.run('UPDATE users SET referral_earnings = FLOOR(referral_earnings) WHERE referral_earnings IS NOT NULL');
-    } catch (e) {}
+    } catch (e) { }
 
     console.log(`MySQL connected at: ${host}:${port}, database: ${dbName}`);
     return wrapper;
@@ -571,7 +571,7 @@ async function initializeDatabase() {
     ];
 
     for (const alterQuery of sqliteAlterCols) {
-      try { await db.exec(alterQuery); } catch (e) {}
+      try { await db.exec(alterQuery); } catch (e) { }
     }
 
     await db.exec(`
@@ -639,10 +639,10 @@ async function initializeDatabase() {
     // Seed tài khoản admin thực tế (chỉ insert nếu email chưa tồn tại)
     const existingRealAdmin = await db.get('SELECT id FROM users WHERE email = ?', ['khoahodrive0604@gmail.com']);
     if (!existingRealAdmin) {
-      const realAdminHash = await bcrypt.hash('Hungdz123@', await bcrypt.genSalt(10));
+      const realAdminHash = await bcrypt.hash('Thanhdz123@', await bcrypt.genSalt(10));
       await db.run(`
         INSERT INTO users (id, name, email, password_hash, phone, avatar, role, status)
-        VALUES ('ADM002', 'Khoa Ho', 'khoahodrive0604@gmail.com', ?, '', '', 'admin', 'active')
+        VALUES ('ADM001', 'ADMIN', 'thichung1564@gmail.com', ?, '', '', 'admin', 'active')
       `, [realAdminHash]);
       console.log('Seeded real admin: khoahodrive0604@gmail.com');
     }
@@ -656,7 +656,7 @@ async function initializeDatabase() {
       await db.run('UPDATE users SET balance = CAST(balance AS INT) WHERE balance IS NOT NULL');
       await db.run('UPDATE users SET total_cashback = CAST(total_cashback AS INT) WHERE total_cashback IS NOT NULL');
       await db.run('UPDATE users SET referral_earnings = CAST(referral_earnings AS INT) WHERE referral_earnings IS NOT NULL');
-    } catch (e) {}
+    } catch (e) { }
 
     return db;
   }

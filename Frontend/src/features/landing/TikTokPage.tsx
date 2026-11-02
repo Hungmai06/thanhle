@@ -203,7 +203,8 @@ export default function TikTokPage() {
         userId: currentUser.id,
         productUrl: checkedProduct.originUrl || tiktokLink,
         shopId: checkedProduct.shopName || 'TikTok Shop',
-        itemId: checkedProduct.productId || ''
+        itemId: checkedProduct.productId || '',
+        platform: 'tiktok'
       };
       addOrder(newOrder);
     } catch {}
