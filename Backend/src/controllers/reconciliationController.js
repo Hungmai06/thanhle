@@ -64,9 +64,9 @@ function normalizeHeader(header) {
     .replace(/[^a-z0-9]/g, ''); // keep only alphanumeric
 }
 
-// Helper to resolve SubID (like ADM002-cashback-web--CLK1789464623170, USR101, CLK1789464623170n1y1ho)
+// Helper to resolve SubID (like ADM002-cashback-web--CLK1789464623170, USR101, CLK1789464623170n1y1ho, USR103)
 // to target UserId, ClickId, and PendingOrderId using token extraction, direct DB lookup, prefix/substring/timestamp matching
-function resolveSubIdToUserId(cleanSubId, { userIds, userMap, affiliateSubIdToUserIdMap, clickSubIdToUserIdMap, orderLookupMap, allClickLogsFull, pendingOrders }) {
+function resolveSubIdToUserId(cleanSubId, { userIds, userMap, affiliateSubIdToUserIdMap, clickSubIdToUserIdMap, orderLookupMap, allClickLogsFull, pendingOrders, consumedOrderIds }) {
   if (!cleanSubId) return { targetUserId: null, targetClickId: null, pendingOrderId: null };
 
   const trimmed = cleanSubId.trim();
@@ -76,6 +76,14 @@ function resolveSubIdToUserId(cleanSubId, { userIds, userMap, affiliateSubIdToUs
   const rawTokens = trimmed.split(/[-_|\s/:,]+/).map(t => t.trim()).filter(Boolean);
   const candidateTokens = Array.from(new Set([trimmed, ...rawTokens]));
 
+  // Ưu tiên trích xuất trực tiếp pattern User ID: USR103, USR..., ADM...
+  const usrMatches = trimmed.match(/(USR\d+|ADM\d+)/gi);
+  if (usrMatches) {
+    for (const um of usrMatches) {
+      if (!candidateTokens.includes(um)) candidateTokens.unshift(um);
+    }
+  }
+
   // Also extract any CLK tracking token if embedded
   const clkMatches = trimmed.match(/clk[a-zA-Z0-9]+/gi);
   if (clkMatches) {
@@ -84,7 +92,48 @@ function resolveSubIdToUserId(cleanSubId, { userIds, userMap, affiliateSubIdToUs
     }
   }
 
-  // 1. Direct match with Orders table in system (order.id or order.click_id)
+  // 1. Ưu tiên hàng đầu: Khớp trực tiếp với User ID trong hệ thống (user.id hoặc user.affiliate_sub_id)
+  // Ví dụ: Sub_id1 = USR103 -> Khớp ngay thành viên USR103!
+  for (const token of candidateTokens) {
+    const lTok = token.toLowerCase();
+    let matchedUid = null;
+    if (userMap && userMap.has(lTok)) {
+      matchedUid = userMap.get(lTok);
+    } else if (userIds) {
+      for (const uid of userIds) {
+        if (uid.toLowerCase() === lTok) {
+          matchedUid = uid;
+          break;
+        }
+      }
+    } else if (affiliateSubIdToUserIdMap && affiliateSubIdToUserIdMap.has(lTok)) {
+      matchedUid = affiliateSubIdToUserIdMap.get(lTok);
+    }
+
+    if (matchedUid) {
+      // Tìm xem user này có đơn chờ nào trong hệ thống chưa được đối soát không
+      let userPendingId = null;
+      let userClickId = null;
+      if (pendingOrders && pendingOrders.length > 0) {
+        const found = pendingOrders.find(p => 
+          p.user_id && 
+          p.user_id.toLowerCase() === matchedUid.toLowerCase() &&
+          (!consumedOrderIds || !consumedOrderIds.has(p.id.toLowerCase()))
+        );
+        if (found) {
+          userPendingId = found.id;
+          userClickId = found.click_id || found.id;
+        }
+      }
+      return {
+        targetUserId: matchedUid,
+        targetClickId: userClickId,
+        pendingOrderId: userPendingId
+      };
+    }
+  }
+
+  // 2. Direct match with Orders table in system (order.id or order.click_id)
   if (orderLookupMap) {
     for (const token of candidateTokens) {
       const lTok = token.toLowerCase();
@@ -101,7 +150,7 @@ function resolveSubIdToUserId(cleanSubId, { userIds, userMap, affiliateSubIdToUs
     }
   }
 
-  // 2. Direct match with click_logs or clickSubIdToUserIdMap
+  // 3. Direct match with click_logs or clickSubIdToUserIdMap
   if (clickSubIdToUserIdMap) {
     for (const token of candidateTokens) {
       const lTok = token.toLowerCase();
@@ -112,36 +161,6 @@ function resolveSubIdToUserId(cleanSubId, { userIds, userMap, affiliateSubIdToUs
           pendingOrderId: null
         };
       }
-    }
-  }
-
-  // 3. Direct match with Users (user.id or user.affiliate_sub_id)
-  for (const token of candidateTokens) {
-    const lTok = token.toLowerCase();
-    if (userMap && userMap.has(lTok)) {
-      return {
-        targetUserId: userMap.get(lTok),
-        targetClickId: null,
-        pendingOrderId: null
-      };
-    }
-    if (userIds) {
-      for (const uid of userIds) {
-        if (uid.toLowerCase() === lTok) {
-          return {
-            targetUserId: uid,
-            targetClickId: null,
-            pendingOrderId: null
-          };
-        }
-      }
-    }
-    if (affiliateSubIdToUserIdMap && affiliateSubIdToUserIdMap.has(lTok)) {
-      return {
-        targetUserId: affiliateSubIdToUserIdMap.get(lTok),
-        targetClickId: null,
-        pendingOrderId: null
-      };
     }
   }
 
@@ -325,6 +344,18 @@ function extractRowFields(row) {
   }
 
   // === SUB ID (User Identifier) ===
+  // Ưu tiên trích xuất riêng Sub_id1 (chứa mã thành viên như USR103)
+  let subId1 = '';
+  for (const k of ['subid1', 'sub_id1', 'sub1']) {
+    if (normMap[k] && normMap[k].val) {
+      const v = normMap[k].val.trim();
+      if (v && v !== '-' && v.toLowerCase() !== 'null' && v.toLowerCase() !== 'undefined') {
+        subId1 = v;
+        break;
+      }
+    }
+  }
+
   // Collect from all official and custom sub columns: Sub_id1, Sub_id2, Sub_id3, Sub_id4, Sub_id5
   const subCandidateKeys = [
     'subid1', 'sub_id1', 'sub1',
@@ -555,6 +586,7 @@ function extractRowFields(row) {
   return {
     orderId,
     subId,
+    subId1,
     productName,
     shopName,
     orderAmount,
@@ -1142,6 +1174,7 @@ function groupRowsByOrderId(rows) {
       grouped.set(lowerId, {
         orderId: fields.orderId,
         subId: fields.subId || '',
+        subId1: fields.subId1 || '',
         productNames: fields.productName ? [fields.productName] : [],
         shopNames: fields.shopName ? [fields.shopName] : [],
         shopIds: fields.shopId ? [fields.shopId] : [],
@@ -1162,6 +1195,9 @@ function groupRowsByOrderId(rows) {
       
       if (!existing.subId && fields.subId) {
         existing.subId = fields.subId;
+      }
+      if (!existing.subId1 && fields.subId1) {
+        existing.subId1 = fields.subId1;
       }
       if (fields.productName && !existing.productNames.includes(fields.productName)) {
         existing.productNames.push(fields.productName);
@@ -1211,6 +1247,7 @@ function groupRowsByOrderId(rows) {
     return {
       orderId: item.orderId,
       subId: item.subId,
+      subId1: item.subId1 || '',
       productName: combinedName || 'Sản phẩm mua từ Shopee',
       shopName: item.shopNames.join(', ') || item.shopName || '',
       orderAmount: Math.floor(item.orderAmount),
@@ -1357,10 +1394,11 @@ async function uploadAndAnalyze(req, res) {
     const consumedPendingOrderIds = new Set();
 
     for (const order of ordersToProcess) {
-      const { orderId, subId, productName, orderAmount, commission, shopeeStatus, purchaseTime, clickTime, shopId, itemId } = order;
+      const { orderId, subId, subId1, productName, orderAmount, commission, shopeeStatus, purchaseTime, clickTime, shopId, itemId } = order;
 
-      // Clean SubID (sometimes sub_id contains spaces or @)
-      const cleanSubId = subId ? subId.trim() : '';
+      // Ưu tiên subId1 nếu có (ví dụ USR103), sau đó mới tới subId kết hợp
+      const effectiveSubId = subId1 || subId || '';
+      const cleanSubId = effectiveSubId ? effectiveSubId.trim() : '';
 
       // Determine Status
       const mappedStatus = mapShopeeStatus(shopeeStatus);
@@ -1376,6 +1414,7 @@ async function uploadAndAnalyze(req, res) {
       let targetClickId = null;
       let smartMatchInfo = null;
 
+      // 1. ƯU TIÊN HÀNG ĐẦU: Khớp từ Sub ID (ví dụ Sub_id1 = USR103)
       if (cleanSubId) {
         const resolved = resolveSubIdToUserId(cleanSubId, {
           userIds,
@@ -1384,18 +1423,19 @@ async function uploadAndAnalyze(req, res) {
           clickSubIdToUserIdMap,
           orderLookupMap,
           allClickLogsFull,
-          pendingOrders
+          pendingOrders,
+          consumedOrderIds: consumedPendingOrderIds
         });
         if (resolved.targetUserId) {
           targetUserId = resolved.targetUserId;
           targetClickId = resolved.targetClickId || null;
-          if (resolved.pendingOrderId) {
+          if (resolved.pendingOrderId && !consumedPendingOrderIds.has(resolved.pendingOrderId.toLowerCase())) {
             smartMatchInfo = {
               score: 100,
               userId: resolved.targetUserId,
               clickId: resolved.targetClickId,
               pendingOrderId: resolved.pendingOrderId,
-              reason: `Khớp Đơn trong hệ thống (${resolved.pendingOrderId}) từ SubID`
+              reason: `Ưu tiên Sub ID (${cleanSubId}): Khớp đơn chờ ${resolved.pendingOrderId} của User ${resolved.targetUserId}`
             };
             consumedPendingOrderIds.add(resolved.pendingOrderId.toLowerCase());
           }
@@ -1406,8 +1446,8 @@ async function uploadAndAnalyze(req, res) {
         targetUserId = currentDbUserId || null;
       }
 
-      // If not resolved from direct SubID order match, run smart matching (same day + product info)
-      if (!smartMatchInfo) {
+      // 2. NẾU CHƯA KHỚP TỪ SUB ID: Mới chạy thuật toán quét thông minh theo ngày tháng + item_id + shop_id
+      if (!smartMatchInfo && !targetUserId) {
         smartMatchInfo = findSmartMatchedUser(purchaseTime, productName, orderAmount, allClickLogsFull, pendingOrders, { 
           clickTimeStr: clickTime, 
           shopId, 
@@ -1500,11 +1540,45 @@ async function uploadAndAnalyze(req, res) {
         }
       } else {
         // Đơn hàng mới từ file CSV Shopee (chưa từng đối soát trước đó)
-        // BẮT BUỘC PHẢI KHỚP VỚI MỘT ĐƠN ĐANG CHỜ TẠO BẰNG CLK TRÊN WEB
         const matchedPendingId = (smartMatchInfo && smartMatchInfo.pendingOrderId) ? smartMatchInfo.pendingOrderId : null;
 
-        if (!matchedPendingId) {
-          // BỎ QUA: Không có đơn chờ CLK nào trên web khớp với dòng này
+        if (matchedPendingId) {
+          // Khớp thành công với đơn CLK đang chờ trên web
+          report.matchedCount++;
+          report.details.push({
+            id: orderId,
+            name: productName,
+            shopId: order.shopId || '',
+            itemId: order.itemId || '',
+            shopName: order.shopName || '',
+            amount: orderAmount,
+            cashback: userCashback,
+            subId: targetUserId || smartMatchInfo.userId || cleanSubId,
+            shopeeStatus: mappedStatus,
+            status: 'matched',
+            reason: (smartMatchInfo && smartMatchInfo.reason)
+              ? smartMatchInfo.reason
+              : `Khớp & cập nhật Đơn chờ CLK trên web (${matchedPendingId}) -> ${orderId} cho User ${targetUserId || smartMatchInfo.userId || 'chưa gán'}`
+          });
+        } else if (targetUserId) {
+          // Ưu tiên Sub ID: Không có đơn chờ CLK nhưng xác định được User từ Sub ID (ví dụ sub_id1 = USR103)
+          // -> Tự động ghi nhận và tạo đơn cho User này
+          report.matchedCount++;
+          report.details.push({
+            id: orderId,
+            name: productName,
+            shopId: order.shopId || '',
+            itemId: order.itemId || '',
+            shopName: order.shopName || '',
+            amount: orderAmount,
+            cashback: userCashback,
+            subId: targetUserId,
+            shopeeStatus: mappedStatus,
+            status: 'matched',
+            reason: `Ưu tiên Sub ID (${cleanSubId}): Ghi nhận đơn mới cho User ${targetUserId}`
+          });
+        } else {
+          // BỎ QUA: Không có Sub ID hợp lệ và không có đơn chờ nào khớp ngày tháng
           report.missingCount++;
           report.details.push({
             id: orderId,
@@ -1514,29 +1588,12 @@ async function uploadAndAnalyze(req, res) {
             shopName: order.shopName || '',
             amount: orderAmount,
             cashback: userCashback,
-            subId: cleanSubId || targetUserId || '',
+            subId: cleanSubId || '',
             shopeeStatus: mappedStatus,
             status: 'ignored',
-            reason: 'Chưa có trong hệ thống: Không tìm thấy đơn chờ CLK nào trên web khớp với đơn này'
+            reason: 'Không tìm thấy User (Sub ID) và không có đơn chờ nào khớp ngày tháng'
           });
-          continue;
         }
-
-        // Khớp thành công với đơn CLK đang chờ trên web
-        report.matchedCount++;
-        report.details.push({
-          id: orderId,
-          name: productName,
-          shopId: order.shopId || '',
-          itemId: order.itemId || '',
-          shopName: order.shopName || '',
-          amount: orderAmount,
-          cashback: userCashback,
-          subId: targetUserId || smartMatchInfo.userId || cleanSubId,
-          shopeeStatus: mappedStatus,
-          status: 'matched',
-          reason: `Khớp & cập nhật Đơn chờ CLK trên web (${matchedPendingId}) -> ${orderId} cho User ${targetUserId || smartMatchInfo.userId || 'chưa gán'} (${smartMatchInfo.reason})`
-        });
       }
     }
 
@@ -1650,9 +1707,10 @@ async function applyReconciliation(req, res) {
     const consumedPendingOrderIds = new Set();
 
     for (const order of ordersToProcess) {
-      const { orderId, subId, productName, orderAmount, commission, shopeeStatus, purchaseTime, clickTime, shopId, itemId } = order;
+      const { orderId, subId, subId1, productName, orderAmount, commission, shopeeStatus, purchaseTime, clickTime, shopId, itemId } = order;
 
-      const cleanSubId = subId ? subId.trim() : '';
+      const effectiveSubId = subId1 || subId || '';
+      const cleanSubId = effectiveSubId ? effectiveSubId.trim() : '';
       const mappedStatus = mapShopeeStatus(shopeeStatus);
 
       const lowerOrderId = orderId.toLowerCase();
@@ -1666,6 +1724,7 @@ async function applyReconciliation(req, res) {
       let resolvedPendingOrderId = null;
       let smartMatchInfo = null;
 
+      // 1. ƯU TIÊN HÀNG ĐẦU: Khớp từ Sub ID (ví dụ Sub_id1 = USR103)
       if (cleanSubId) {
         const resolved = resolveSubIdToUserId(cleanSubId, {
           userIds,
@@ -1674,18 +1733,19 @@ async function applyReconciliation(req, res) {
           clickSubIdToUserIdMap,
           orderLookupMap,
           allClickLogsFull,
-          pendingOrders
+          pendingOrders,
+          consumedOrderIds: consumedPendingOrderIds
         });
         if (resolved.targetUserId) {
           targetUserId = resolved.targetUserId;
           targetClickId = resolved.targetClickId || null;
-          if (resolved.pendingOrderId) {
+          if (resolved.pendingOrderId && !consumedPendingOrderIds.has(resolved.pendingOrderId.toLowerCase())) {
             resolvedPendingOrderId = resolved.pendingOrderId;
             smartMatchInfo = {
               userId: resolved.targetUserId,
               clickId: resolved.targetClickId,
               pendingOrderId: resolved.pendingOrderId,
-              reason: `Khớp Đơn trong hệ thống (${resolved.pendingOrderId}) từ SubID`
+              reason: `Ưu tiên Sub ID (${cleanSubId}): Khớp đơn chờ ${resolved.pendingOrderId} của User ${resolved.targetUserId}`
             };
             consumedPendingOrderIds.add(resolved.pendingOrderId.toLowerCase());
           }
@@ -1696,7 +1756,8 @@ async function applyReconciliation(req, res) {
         targetUserId = currentDbUserId || null; // keep existing user
       }
 
-      if (!smartMatchInfo) {
+      // 2. NẾU CHƯA KHỚP TỪ SUB ID: Mới chạy thuật toán quét thông minh theo ngày tháng + item_id + shop_id
+      if (!smartMatchInfo && !targetUserId) {
         smartMatchInfo = findSmartMatchedUser(purchaseTime, productName, orderAmount, allClickLogsFull, pendingOrders, { 
           clickTimeStr: clickTime, 
           shopId, 
@@ -1865,53 +1926,78 @@ async function applyReconciliation(req, res) {
         updatedCount++;
       } else {
         // Đơn hàng mới từ file CSV Shopee (chưa từng có trong hệ thống)
-        // BẮT BUỘC PHẢI KHỚP VỚI MỘT ĐƠN ĐANG CHỜ TẠO BẰNG CLK TRÊN WEB
         const pendingIdToUpdate = resolvedPendingOrderId || ((smartMatchInfo && smartMatchInfo.pendingOrderId) ? smartMatchInfo.pendingOrderId : null);
+        const finalUserId = targetUserId || (smartMatchInfo && smartMatchInfo.userId) || null;
 
-        if (!pendingIdToUpdate) {
-          // Không tìm thấy đơn chờ CLK tương ứng trên web -> BỎ QUA, TUYỆT ĐỐI KHÔNG TẠO ĐƠN MỚI
+        if (!pendingIdToUpdate && !finalUserId) {
+          // Cả Sub ID và ngày tháng đều không tìm thấy User -> Bỏ qua
           ignoredCount++;
           continue;
         }
 
-        const finalUserId = targetUserId || (smartMatchInfo && smartMatchInfo.userId) || null;
+        if (pendingIdToUpdate) {
+          // Có đơn chờ CLK tương ứng trên web -> Cập nhật đơn chờ này thành mã đơn thật
+          await db.run(
+            `UPDATE orders
+             SET id = ?,
+                 click_id = COALESCE(click_id, ?),
+                 product_name = CASE WHEN ? != '' THEN ? ELSE product_name END,
+                 order_amount = CASE WHEN ? > 0 THEN ? ELSE order_amount END,
+                 shopee_commission = ?,
+                 estimated_cashback = ?,
+                 real_cashback = ?,
+                 status = ?,
+                 user_id = COALESCE(?, user_id),
+                 shop_id = CASE WHEN ? != '' THEN ? ELSE shop_id END,
+                 item_id = CASE WHEN ? != '' THEN ? ELSE item_id END,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [
+              orderId,
+              pendingIdToUpdate,
+              productName,
+              productName,
+              Math.floor(orderAmount),
+              Math.floor(orderAmount),
+              Math.floor(commission),
+              userCashback,
+              userCashback,
+              mappedStatus,
+              finalUserId,
+              shopId,
+              shopId,
+              itemId,
+              itemId,
+              pendingIdToUpdate
+            ]
+          );
+          updatedCount++;
+        } else {
+          // Ưu tiên Sub ID: Không có đơn chờ CLK nhưng xác định được User từ Sub ID (ví dụ sub_id1 = USR103)
+          // -> Tự động TẠO MỚI đơn hàng cho User này
+          const formattedDate = formatToMySQLDateTime(purchaseTime);
+          await db.run(
+            `INSERT INTO orders (id, user_id, click_id, product_name, order_amount, shopee_commission, estimated_cashback, real_cashback, status, shop_id, item_id, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            [
+              orderId,
+              finalUserId,
+              targetClickId || null,
+              productName || 'Sản phẩm mua từ Shopee',
+              Math.floor(orderAmount),
+              Math.floor(commission),
+              userCashback,
+              userCashback,
+              mappedStatus,
+              shopId || '',
+              itemId || '',
+              formattedDate
+            ]
+          );
+          insertedCount++;
+        }
 
-        await db.run(
-          `UPDATE orders
-           SET id = ?,
-               click_id = COALESCE(click_id, ?),
-               product_name = CASE WHEN ? != '' THEN ? ELSE product_name END,
-               order_amount = CASE WHEN ? > 0 THEN ? ELSE order_amount END,
-               shopee_commission = ?,
-               estimated_cashback = ?,
-               real_cashback = ?,
-               status = ?,
-               user_id = COALESCE(?, user_id),
-               shop_id = CASE WHEN ? != '' THEN ? ELSE shop_id END,
-               item_id = CASE WHEN ? != '' THEN ? ELSE item_id END,
-               updated_at = CURRENT_TIMESTAMP
-           WHERE id = ?`,
-          [
-            orderId,
-            pendingIdToUpdate,
-            productName,
-            productName,
-            Math.floor(orderAmount),
-            Math.floor(orderAmount),
-            Math.floor(commission),
-            userCashback,
-            userCashback,
-            mappedStatus,
-            finalUserId,
-            shopId,
-            shopId,
-            itemId,
-            itemId,
-            pendingIdToUpdate
-          ]
-        );
-
-        // Calculate and add money to user if new order is already approved
+        // Calculate and add money to user if new order is already approved or paid
         if (finalUserId && (mappedStatus === 'approved' || mappedStatus === 'paid')) {
           const finalCashback = userCashback;
           if (finalCashback > 0) {
@@ -1944,6 +2030,10 @@ async function applyReconciliation(req, res) {
 
             const notifId = `NT${Date.now()}${Math.floor(10 + Math.random() * 90)}`;
             const amountDisplay = userCashback.toLocaleString('vi-VN');
+            const notifMsg = pendingIdToUpdate
+              ? `Đơn hàng ${orderId} (${(productName || 'Sản phẩm').substring(0, 20)}...) khớp với đơn ${pendingIdToUpdate} trên web đã được duyệt. Tiền hoàn +${amountDisplay}đ đã được cộng.`
+              : `Đơn hàng Shopee ${orderId} (${(productName || 'Sản phẩm').substring(0, 20)}...) đã được đối soát thành công (Sub ID: ${cleanSubId || finalUserId}). Tiền hoàn +${amountDisplay}đ đã được cộng.`;
+
             await db.run(
               `INSERT INTO notifications (id, user_id, title, content, type)
                VALUES (?, ?, ?, ?, 'order')`,
@@ -1951,13 +2041,11 @@ async function applyReconciliation(req, res) {
                 notifId,
                 finalUserId,
                 'Đơn hàng Shopee đã đối soát thành công',
-                `Đơn hàng ${orderId} (${(productName || 'Sản phẩm').substring(0, 20)}...) khớp với đơn ${pendingIdToUpdate} trên web đã được duyệt. Tiền hoàn +${amountDisplay}đ đã được cộng.`
+                notifMsg
               ]
             );
           }
         }
-
-        updatedCount++;
       }
     }
 
