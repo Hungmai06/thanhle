@@ -4,7 +4,8 @@ import { useAppStore } from '../../store/appStore';
 import type { Order } from '../../store/appStore';
 import { 
   Search, Lock, ShoppingBag, 
-  TrendingUp, Wallet, Clock, Coins, Landmark
+  TrendingUp, Wallet, Clock, Coins, Landmark,
+  CheckCircle2, XCircle
 } from 'lucide-react';
 import { Button, Card, CardContent, Badge } from '../../components/ui/core';
 
@@ -383,7 +384,7 @@ export default function TrackingPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
               <input
                 type="text"
-                placeholder="Tìm mã đơn, tên sản phẩm..."
+                placeholder="Tìm kiếm theo tên sản phẩm..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 border border-border text-xs rounded-input focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
@@ -410,12 +411,12 @@ export default function TrackingPage() {
             <thead>
               <tr className="border-b border-border bg-bg/60 font-bold text-text-secondary">
                 <th className="py-3.5 px-3 rounded-l-input">Sàn</th>
-                <th className="py-3.5 px-3">Mã đơn</th>
                 <th className="py-3.5 px-3">Thời gian ghi nhận</th>
                 <th className="py-3.5 px-4">Sản phẩm</th>
                 <th className="py-3.5 px-3 text-right">Giá trị đơn</th>
                 <th className="py-3.5 px-3 text-right">Tiền hoàn dự kiến</th>
                 <th className="py-3.5 px-3 text-right">Tiền hoàn nhận được</th>
+                <th className="py-3.5 px-3 text-center">Tồn tại</th>
                 <th className="py-3.5 px-3 text-center rounded-r-input">Trạng thái</th>
               </tr>
             </thead>
@@ -442,7 +443,6 @@ export default function TrackingPage() {
                           </span>
                         )}
                       </td>
-                      <td className="py-4 px-3 font-mono font-bold text-text">{order.id}</td>
                       <td className="py-4 px-3 text-text-secondary font-medium whitespace-nowrap">{order.createdTime ? String(order.createdTime).substring(0, 16) : 'Vừa xong'}</td>
                       <td className="py-4 px-4 max-w-[260px]">
                         <div className="flex items-center gap-2.5">
@@ -475,6 +475,17 @@ export default function TrackingPage() {
                           </span>
                         ) : (
                           <span className="text-slate-400 text-xs">0đ</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-3 text-center whitespace-nowrap">
+                        {isApproved ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Tồn tại
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 shadow-xs">
+                            <XCircle className="w-3.5 h-3.5 text-rose-500" /> Không
+                          </span>
                         )}
                       </td>
                       <td className="py-4 px-3 text-center whitespace-nowrap">{getStatusBadge(order.status)}</td>

@@ -6,7 +6,8 @@ import {
   LogOut, RefreshCw, Plus, Search,
   Filter, Check, X, Lock, Unlock, Trash2, Edit2, Download,
   Upload, BarChart3, FileSpreadsheet, HelpCircle,
-  Settings2, Activity, Eye, EyeOff, Key, ExternalLink, Menu, PlayCircle
+  Settings2, Activity, Eye, EyeOff, Key, ExternalLink, Menu, PlayCircle,
+  CheckCircle2, XCircle
 } from 'lucide-react';
 import {
   Button, Card, CardContent, CardHeader, CardTitle, CardDescription,
@@ -2246,6 +2247,7 @@ export default function AdminPanel() {
                         <TableHead className="text-right">Hoa Hồng Shopee (100%)</TableHead>
                         <TableHead className="text-right">Hoàn Tiền Khách</TableHead>
                         <TableHead>Ngày Đặt</TableHead>
+                        <TableHead className="text-center">Tồn tại</TableHead>
                         <TableHead>Trạng Thái</TableHead>
                         <TableHead className="text-center">Thao Tác</TableHead>
                       </TableRow>
@@ -2253,14 +2255,14 @@ export default function AdminPanel() {
                     <TableBody>
                       {isLoadingOrders ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center py-16 text-xs text-text-secondary font-medium">
+                          <TableCell colSpan={10} className="text-center py-16 text-xs text-text-secondary font-medium">
                             <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-primary" />
                             Đang tải danh sách đơn hàng...
                           </TableCell>
                         </TableRow>
                       ) : paginatedOrders.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center py-16 text-xs text-text-secondary font-medium">
+                          <TableCell colSpan={10} className="text-center py-16 text-xs text-text-secondary font-medium">
                             Chưa có đơn hàng nào phát sinh hoặc không tìm thấy đơn hàng phù hợp với từ khóa tìm kiếm.
                           </TableCell>
                         </TableRow>
@@ -2289,6 +2291,17 @@ export default function AdminPanel() {
                               <TableCell className="text-right font-bold text-primary">{Math.floor(userCashback).toLocaleString('vi-VN')}đ</TableCell>
                               <TableCell className="text-xs font-semibold text-text-secondary">
                                 {o.createdTime ? o.createdTime.substring(0, 16) : '-'}
+                              </TableCell>
+                              <TableCell className="text-center whitespace-nowrap">
+                                {o.status === 'approved' || o.status === 'paid' ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Tồn tại
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 shadow-xs">
+                                    <XCircle className="w-3.5 h-3.5 text-rose-500" /> Không
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell>
                                 {o.status === 'pending' && <Badge variant="info">Đang chờ xử lý</Badge>}
@@ -2521,6 +2534,7 @@ export default function AdminPanel() {
                         <TableHead className="text-right">Hoa Hồng Sàn (100%)</TableHead>
                         <TableHead className="text-right">Hoàn Tiền Khách</TableHead>
                         <TableHead>Ngày Đặt</TableHead>
+                        <TableHead className="text-center">Tồn tại</TableHead>
                         <TableHead>Trạng Thái</TableHead>
                         <TableHead className="text-center">Thao Tác</TableHead>
                       </TableRow>
@@ -2528,14 +2542,14 @@ export default function AdminPanel() {
                     <TableBody>
                       {isLoadingTikTokOrders ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center py-16 text-xs text-text-secondary font-medium">
+                          <TableCell colSpan={10} className="text-center py-16 text-xs text-text-secondary font-medium">
                             <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-primary" />
                             Đang tải danh sách đơn hàng TikTok...
                           </TableCell>
                         </TableRow>
                       ) : (tiktokOrders || []).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center py-16 text-xs text-text-secondary font-medium">
+                          <TableCell colSpan={10} className="text-center py-16 text-xs text-text-secondary font-medium">
                             Chưa có đơn hàng TikTok nào hoặc không tìm thấy đơn phù hợp. Nhấn "Đồng bộ nhanh" để tải đơn về!
                           </TableCell>
                         </TableRow>
@@ -2593,6 +2607,17 @@ export default function AdminPanel() {
                               </TableCell>
                               <TableCell className="text-xs text-text-secondary font-medium whitespace-nowrap">
                                 {order.createdTime ? String(order.createdTime).substring(0, 16) : '-'}
+                              </TableCell>
+                              <TableCell className="text-center whitespace-nowrap">
+                                {order.status === 'approved' || order.status === 'paid' ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Tồn tại
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 shadow-xs">
+                                    <XCircle className="w-3.5 h-3.5 text-rose-500" /> Không
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell>
                                 {order.status === 'approved' && <Badge variant="success">Hoàn thành</Badge>}

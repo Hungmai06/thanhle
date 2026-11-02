@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingCart, Wallet, Bell, Heart,
   ArrowUpRight, LifeBuoy, Settings, LogOut, Package, Clock,
-  CheckCircle2, AlertTriangle, Coins, Upload,
+  CheckCircle2, XCircle, AlertTriangle, Coins, Upload,
   Check, ShieldCheck, ChevronRight,
   FileText, Landmark, Users, Copy, Send, Link2
 } from 'lucide-react';
@@ -432,10 +432,10 @@ export default function UserDashboard() {
                     <TableContainer>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Mã Đơn</TableHead>
                           <TableHead>Tên Sản Phẩm</TableHead>
                           <TableHead className="text-right">Giá Trị</TableHead>
                           <TableHead className="text-right">Ước Tính Hoàn</TableHead>
+                          <TableHead className="text-center">Tồn tại</TableHead>
                           <TableHead>Trạng Thái</TableHead>
                           <TableHead>Thời Gian</TableHead>
                         </TableRow>
@@ -443,11 +443,21 @@ export default function UserDashboard() {
                       <TableBody>
                         {userOrders.slice(0, 4).map((order) => (
                           <TableRow key={order.id} onClick={() => setSelectedOrder(order)}>
-                            <TableCell className="font-bold text-primary">{order.id}</TableCell>
                             <TableCell className="max-w-[200px] truncate font-semibold">{order.productName}</TableCell>
                             <TableCell className="text-right font-semibold">{Math.floor(order.orderAmount).toLocaleString('vi-VN')}đ</TableCell>
                             <TableCell className="text-right font-bold text-primary">
                               {Math.floor(order.estimatedCashback).toLocaleString('vi-VN')}đ
+                            </TableCell>
+                            <TableCell className="text-center whitespace-nowrap">
+                              {order.status === 'approved' || order.status === 'paid' ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Tồn tại
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-600 border border-rose-200 shadow-xs">
+                                  <XCircle className="w-3 h-3 text-rose-500" /> Không
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell>{getStatusBadge(order.status)}</TableCell>
                             <TableCell className="text-xs text-text-secondary font-medium">{order.createdTime}</TableCell>
@@ -530,11 +540,11 @@ export default function UserDashboard() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Sàn</TableHead>
-                          <TableHead>Mã Đơn</TableHead>
                           <TableHead>Sản Phẩm</TableHead>
                           <TableHead className="text-right">Số Tiền Đơn</TableHead>
                           <TableHead className="text-right">Tiền Hoàn Dự Kiến</TableHead>
                           <TableHead className="text-right">Thực Nhận</TableHead>
+                          <TableHead className="text-center">Tồn tại</TableHead>
                           <TableHead>Trạng Thái</TableHead>
                           <TableHead>Thời Gian</TableHead>
                         </TableRow>
@@ -564,7 +574,6 @@ export default function UserDashboard() {
                                   </span>
                                 )}
                               </TableCell>
-                              <TableCell className="font-bold text-primary">{order.id}</TableCell>
                               <TableCell className="max-w-[240px] truncate font-semibold">
                                 <span className="truncate">{order.productName}</span>
                               </TableCell>
@@ -572,6 +581,17 @@ export default function UserDashboard() {
                               <TableCell className="text-right font-bold text-primary">{Math.floor(order.estimatedCashback).toLocaleString('vi-VN')}đ</TableCell>
                               <TableCell className="text-right font-bold text-success">
                                 {order.realCashback ? `${Math.floor(order.realCashback).toLocaleString('vi-VN')}đ` : '-'}
+                              </TableCell>
+                              <TableCell className="text-center whitespace-nowrap">
+                                {order.status === 'approved' || order.status === 'paid' ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Tồn tại
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 shadow-xs">
+                                    <XCircle className="w-3.5 h-3.5 text-rose-500" /> Không
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell>{getStatusBadge(order.status)}</TableCell>
                               <TableCell className="text-xs text-text-secondary font-medium">{order.createdTime}</TableCell>

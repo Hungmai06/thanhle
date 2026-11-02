@@ -1,6 +1,6 @@
 # 🚀 Hướng Dẫn Đóng Gói & Deploy Máy Chủ (Git & Docker)
 
-Tài liệu này hướng dẫn chi tiết từng bước để đẩy mã nguồn dự án **Hũ Tài Lộc (Shopee Cashback Affiliate)** lên Git và triển khai tự động bằng Docker & Docker Compose trên máy chủ VPS cho subdomain **`thanhle.hutailoc.shop`**.
+Tài liệu này hướng dẫn chi tiết từng bước để đẩy mã nguồn dự án **Kiếm Xu (Shopee & TikTok Cashback Affiliate)** lên Git và triển khai tự động bằng Docker & Docker Compose trên máy chủ VPS cho tên miền chính **`kiemxu.vn`** (và **`www.kiemxu.vn`**).
 
 ---
 
@@ -9,20 +9,27 @@ Tài liệu này hướng dẫn chi tiết từng bước để đẩy mã ngu�
 Dự án đã được đặt tên riêng biệt với tiền tố **`thanhle_`** để hoàn toàn không bị xung đột với các website hoặc container khác đang chạy trên VPS:
 1. **Database Container (`thanhle_mysql`)**: Chạy cơ sở dữ liệu **MariaDB 10.11 / MySQL 8.0** độc lập. Toàn bộ dữ liệu tài khoản, đơn hàng và số dư được lưu trữ bền vững vào Docker Volume (`thanhle_mysql_data`).
 2. **Backend Container (`thanhle_backend`)**: Chạy Node.js API (Cổng ánh xạ `5001:5000`), kết nối trực tiếp với Database Container (`db:3306`).
-3. **Frontend Container (`thanhle_frontend`)**: Chạy React Nginx Web Server (Cổng ánh xạ `8388:80`), phục vụ subdomain **`thanhle.hutailoc.shop`** và Reverse Proxy tất cả yêu cầu `/api/` về Backend.
+3. **Frontend Container (`thanhle_frontend`)**: Chạy React Nginx Web Server (Cổng ánh xạ `8388:80`), phục vụ tên miền **`kiemxu.vn`** và Reverse Proxy tất cả yêu cầu `/api/` về Backend.
 
 ---
 
-## 🌐 BƯỚC 0: Cấu Hình DNS Tên Miền (Trỏ Subdomain Về VPS)
+## 🌐 BƯỚC 0: Cấu Hình DNS Tên Miền (Trỏ kiemxu.vn Về VPS)
 
-Trước khi cấu hình trên VPS, bạn vào trang quản trị DNS của tên miền **`hutailoc.shop`** (trên Cloudflare, Namecheap, iNET, PA Vietnam...):
+Trước khi cấu hình trên VPS, bạn vào trang quản trị DNS của tên miền **`kiemxu.vn`** (trên Cloudflare, iNET, PA Vietnam, Mat Bao, Tenten...):
 
-- **Tạo bản ghi A**:
-  - **Type**: `A`
-  - **Name (Host)**: `thanhle`
-  - **Value (IPv4)**: `[Địa chỉ IP VPS của bạn]` (Ví dụ: `161.248.4.83`)
-  - **TTL**: `Auto` hoặc `300s`
-  - *(Lưu ý: Nếu dùng Cloudflare, tạm thời để **DNS Only** - tắt đám mây cam để chạy lệnh cấp chứng chỉ SSL Certbot không bị lỗi).*
+1. **Bản ghi 1 (Tên miền chính - Root domain)**:
+   - **Type**: `A`
+   - **Name (Host)**: `@` *(hoặc để trống tùy nhà cung cấp)*
+   - **Value (IPv4)**: `[Địa chỉ IP VPS của bạn]` (Ví dụ: `161.248.4.83`)
+   - **TTL**: `Auto` hoặc `300s`
+
+2. **Bản ghi 2 (Tên miền có www)**:
+   - **Type**: `A` *(hoặc CNAME)*
+   - **Name (Host)**: `www`
+   - **Value (IPv4)**: `[Địa chỉ IP VPS của bạn]` *(nếu CNAME thì điền `kiemxu.vn`)*
+   - **TTL**: `Auto` hoặc `300s`
+
+> ⚠️ *(Lưu ý: Nếu dùng Cloudflare, tạm thời để **DNS Only** - tắt đám mây màu cam để chạy lệnh cấp chứng chỉ SSL Certbot ở Bước 6 không bị lỗi xác thực).*
 
 ---
 
@@ -30,10 +37,10 @@ Trước khi cấu hình trên VPS, bạn vào trang quản trị DNS của tên
 
 Thực hiện các lệnh sau trên terminal máy tính cá nhân của bạn để đẩy toàn bộ code mới nhất lên GitHub:
 
-```bash
+```powershell
 git add .
-git commit -m "Update unique container names and ports for thanhle.hutailoc.shop"
-git push origin main
+git commit -m "Configure domain kiemxu.vn"
+git push origin redesign/affiliateshoppe:main
 ```
 
 ---
@@ -110,7 +117,7 @@ docker compose logs -f backend
 
 ---
 
-## 🔒 BƯỚC 6: Cấu Hình Nginx Host & SSL HTTPS Cho Subdomain `thanhle.hutailoc.shop`
+## 🔒 BƯỚC 6: Cấu Hình Nginx Host & SSL HTTPS Cho `kiemxu.vn`
 
 Vì VPS đang chạy Web Server chính (Nginx) đón cổng 80 & 443 ngoài Internet, ta sẽ cấu hình Host Nginx chuyển tiếp (Reverse Proxy) vào Container Frontend (cổng 8388).
 
@@ -121,7 +128,7 @@ sudo apt install -y nginx certbot python3-certbot-nginx
 
 ### 6.2 Tạo file cấu hình Nginx:
 ```bash
-sudo nano /etc/nginx/sites-available/thanhle.hutailoc.shop
+sudo nano /etc/nginx/sites-available/kiemxu.vn
 ```
 
 Dán nội dung cấu hình sau vào (lưu ý cổng **`8388`**):
@@ -129,7 +136,7 @@ Dán nội dung cấu hình sau vào (lưu ý cổng **`8388`**):
 ```nginx
 server {
     listen 80;
-    server_name thanhle.hutailoc.shop;
+    server_name kiemxu.vn www.kiemxu.vn;
 
     # Gzip Compression
     gzip on;
@@ -158,22 +165,26 @@ server {
 
 ### 6.3 Kích hoạt cấu hình Nginx:
 ```bash
-sudo ln -sf /etc/nginx/sites-available/thanhle.hutailoc.shop /etc/nginx/sites-enabled/
+# Xoá liên kết cũ nếu trước đó từng tạo subdomain cũ
+sudo rm -f /etc/nginx/sites-enabled/thanhle.hutailoc.shop
+
+# Kích hoạt tên miền mới kiemxu.vn
+sudo ln -sf /etc/nginx/sites-available/kiemxu.vn /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
 ### 6.4 Cài đặt SSL HTTPS miễn phí với Certbot:
 ```bash
-sudo certbot --nginx -d thanhle.hutailoc.shop
+sudo certbot --nginx -d kiemxu.vn -d www.kiemxu.vn
 ```
-*(Certbot sẽ tự động cấu hình HTTPS SSL và tự gia hạn chứng chỉ khi hết hạn).*
+*(Certbot sẽ tự động cấp chứng chỉ HTTPS SSL cho cả `kiemxu.vn` và `www.kiemxu.vn` đồng thời tự gia hạn khi hết hạn).*
 
 ---
 
 ## 🔄 BƯỚC 7: Cập Nhật Code Mỗi Khi Có Thay Đổi
 
-Khi bạn sửa code và push lên GitHub từ máy cá nhân (`git push origin main`), bạn chỉ cần chạy 2 lệnh sau trên VPS:
+Khi bạn sửa code và push lên GitHub từ máy cá nhân (`git push origin redesign/affiliateshoppe:main`), bạn chỉ cần chạy 2 lệnh sau trên VPS:
 
 ```bash
 cd /var/www/thanhle
@@ -184,17 +195,19 @@ docker compose up -d --build
 
 ---
 
-## 🔑 BƯỚC 8: Cấu Hình Đăng Nhập Bằng Google Cho Subdomain Mới
+## 🔑 BƯỚC 8: Cấu Hình Đăng Nhập Bằng Google Cho Tên Miền kiemxu.vn
 
-Để tính năng **"Đăng nhập bằng Google"** hoạt động trơn tru trên `https://thanhle.hutailoc.shop`:
+Để tính năng **"Đăng nhập bằng Google"** hoạt động trơn tru trên `https://kiemxu.vn`:
 
 1. Truy cập [Google Cloud Console - Credentials](https://console.cloud.google.com/apis/credentials).
 2. Nhấp vào **OAuth 2.0 Client ID** mà dự án đang dùng (Web Client).
 3. Tại mục **Authorized JavaScript origins**, thêm:
-   - `https://thanhle.hutailoc.shop`
+   - `https://kiemxu.vn`
+   - `https://www.kiemxu.vn`
    - `http://localhost:5173` *(cho máy local test)*
 4. Tại mục **Authorized redirect URIs**, thêm:
-   - `https://thanhle.hutailoc.shop`
+   - `https://kiemxu.vn`
+   - `https://www.kiemxu.vn`
    - `http://localhost:5173`
 5. Bấm **Save (Lưu)**.
 
