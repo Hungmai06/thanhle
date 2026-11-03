@@ -1,144 +1,186 @@
-# 🚀 Hướng Dẫn Đóng Gói & Deploy Máy Chủ (Git & Docker)
+# 🚀 Hướng Dẫn Triển Khai Toàn Diện Lên Server Mới (kiemxu.vn)
 
-Tài liệu này hướng dẫn chi tiết từng bước để đẩy mã nguồn dự án **Kiếm Xu (Shopee & TikTok Cashback Affiliate)** lên Git và triển khai tự động bằng Docker & Docker Compose trên máy chủ VPS cho tên miền chính **`kiemxu.vn`** (và **`www.kiemxu.vn`**).
-
----
-
-## 🛠️ Kiến Trúc Hệ Thống Trong Docker (3 Service)
-
-Dự án đã được đặt tên riêng biệt với tiền tố **`thanhle_`** để hoàn toàn không bị xung đột với các website hoặc container khác đang chạy trên VPS:
-1. **Database Container (`thanhle_mysql`)**: Chạy cơ sở dữ liệu **MariaDB 10.11 / MySQL 8.0** độc lập. Toàn bộ dữ liệu tài khoản, đơn hàng và số dư được lưu trữ bền vững vào Docker Volume (`thanhle_mysql_data`).
-2. **Backend Container (`thanhle_backend`)**: Chạy Node.js API (Cổng ánh xạ `5001:5000`), kết nối trực tiếp với Database Container (`db:3306`).
-3. **Frontend Container (`thanhle_frontend`)**: Chạy React Nginx Web Server (Cổng ánh xạ `8388:80`), phục vụ tên miền **`kiemxu.vn`** và Reverse Proxy tất cả yêu cầu `/api/` về Backend.
+Tài liệu này hướng dẫn chi tiết từng bước từ A đến Z để triển khai mã nguồn **Kiếm Xu (Shopee & TikTok Affiliate Cashback System)** lên một máy chủ Linux VPS hoàn toàn mới (Ubuntu 20.04 / 22.04 / 24.04 hoặc Debian) sử dụng **Docker & Docker Compose**.
 
 ---
 
-## 🌐 BƯỚC 0: Cấu Hình DNS Tên Miền (Trỏ kiemxu.vn Về VPS)
+## 📌 BẢNG THÔNG TIN HỆ THỐNG
 
-Trước khi cấu hình trên VPS, bạn vào trang quản trị DNS của tên miền **`kiemxu.vn`** (trên Cloudflare, iNET, PA Vietnam, Mat Bao, Tenten...):
-
-1. **Bản ghi 1 (Tên miền chính - Root domain)**:
-   - **Type**: `A`
-   - **Name (Host)**: `@` *(hoặc để trống tùy nhà cung cấp)*
-   - **Value (IPv4)**: `[Địa chỉ IP VPS của bạn]` (Ví dụ: `161.248.4.83`)
-   - **TTL**: `Auto` hoặc `300s`
-
-2. **Bản ghi 2 (Tên miền có www)**:
-   - **Type**: `A` *(hoặc CNAME)*
-   - **Name (Host)**: `www`
-   - **Value (IPv4)**: `[Địa chỉ IP VPS của bạn]` *(nếu CNAME thì điền `kiemxu.vn`)*
-   - **TTL**: `Auto` hoặc `300s`
-
-> ⚠️ *(Lưu ý: Nếu dùng Cloudflare, tạm thời để **DNS Only** - tắt đám mây màu cam để chạy lệnh cấp chứng chỉ SSL Certbot ở Bước 6 không bị lỗi xác thực).*
+| Thông tin | Giá trị triển khai |
+| :--- | :--- |
+| **Tên miền chính** | `https://kiemxu.vn` và `https://www.kiemxu.vn` |
+| **Thư mục dự án** | `/var/www/thanhle` |
+| **Database Container** | `thanhle_mysql` (MariaDB 10.11 / MySQL 8.0, Port nội bộ `3306`) |
+| **Backend Container** | `thanhle_backend` (Node.js API, Port nội bộ `5000`) |
+| **Frontend Container** | `thanhle_frontend` (Nginx React SPA, Port ngoài Host `8388`) |
+| **Reverse Proxy Host** | Nginx cài trực tiếp trên VPS nhận cổng `80` / `443` chuyển tiếp vào `8388` |
+| **Webhook TikTok (RioHub)** | `https://kiemxu.vn/api/tiktok/webhook` |
 
 ---
 
-## 📝 BƯỚC 1: Đẩy Mã Nguồn Lên Git (Máy Local)
+## 🌐 BƯỚC 1: Cấu Hình DNS Tên Miền (Trỏ Về IP Server Mới)
 
-Thực hiện các lệnh sau trên terminal máy tính cá nhân của bạn để đẩy toàn bộ code mới nhất lên GitHub:
+Trước khi cấu hình trên VPS, truy cập bảng quản lý DNS tên miền **`kiemxu.vn`** (Cloudflare, iNET, PA Vietnam, Mắt Bão, Tenten...):
 
-```powershell
-git add .
-git commit -m "Configure domain kiemxu.vn"
-git push origin redesign/affiliateshoppe:main
+1. **Bản ghi A cho tên miền chính (Root domain)**:
+   * **Type**: `A`
+   * **Name**: `@` *(hoặc để trống tùy nhà cung cấp)*
+   * **IPv4 Address**: `[Địa chỉ IP VPS mới]` *(ví dụ: `161.248.4.83`)*
+   * **TTL**: `Auto` hoặc `300s`
+
+2. **Bản ghi A cho www**:
+   * **Type**: `A` *(hoặc CNAME)*
+   * **Name**: `www`
+   * **IPv4 Address**: `[Địa chỉ IP VPS mới]` *(hoặc CNAME trỏ về `kiemxu.vn`)*
+   * **TTL**: `Auto` hoặc `300s`
+
+> ⚠️ **Lưu ý quan trọng nếu dùng Cloudflare:**
+> Tạm thời chuyển đám mây sang **DNS Only** (màu xám, tắt Proxy màu cam) để bước cấp chứng chỉ SSL Let's Encrypt bằng Certbot không bị lỗi xác thực. Sau khi cấp SSL thành công có thể bật lại nếu muốn.
+
+---
+
+## 💻 BƯỚC 2: Chuẩn Bị & Cài Đặt Môi Trường Trên Server Mới
+
+Đăng nhập vào VPS qua SSH bằng quyền `root`:
+```bash
+ssh root@<IP_SERVER_CUA_BAN>
 ```
 
----
-
-## 💻 BƯỚC 2: Chuẩn Bị Máy Chủ VPS (Server Linux)
-
-Đăng nhập vào VPS qua SSH:
+### 2.1 Cập nhật hệ điều hành:
 ```bash
-ssh root@<IP_VPS_CUA_BAN>
-```
-
-### 2.1 Cài đặt Docker & Docker Compose Plugin (nếu VPS mới):
-```bash
-# Cập nhật hệ thống
 sudo apt update && sudo apt upgrade -y
+sudo apt install -y curl git ufw nano htop
+```
 
-# Cài đặt Docker
+### 2.2 Tạo bộ nhớ ảo Swap 2GB (BẮT BUỘC cho VPS 1GB - 2GB RAM):
+> Quá trình build Frontend React Vite tốn RAM, nếu VPS không có Swap sẽ bị lỗi `Killed` hoặc `exit code 1 / Out of Memory`.
+```bash
+# Kiểm tra nếu chưa có swap thì tạo mới 2GB
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# Kiểm tra lại
+free -h
+```
+
+### 2.3 Cài đặt Docker & Docker Compose Plugin:
+Chạy lệnh cài đặt Docker chính hãng mới nhất:
+```bash
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
-
-# Cài đặt Docker Compose Plugin
 sudo apt install -y docker-compose-plugin
 
-# Kiểm tra cài đặt
+# Bật Docker tự khởi động cùng VPS
+sudo systemctl enable docker
+sudo systemctl start docker
+
+# Kiểm tra phiên bản
 docker --version
 docker compose version
 ```
 
-### 2.2 Tạo bộ nhớ ảo Swap (Khuyên dùng cho VPS 1GB - 2GB RAM):
-Tránh bị tràn bộ nhớ (Out of Memory - exit code 1) khi build Frontend:
+### 2.4 Mở tường lửa (Firewall):
 ```bash
-sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
-echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw --force enable
 ```
 
 ---
 
-## 📥 BƯỚC 3: Tải Mã Nguồn Về Server & Cấu Hình
+## 📥 BƯỚC 3: Tải Mã Nguồn & Thiết Lập Cấu Hình
 
-### 3.1 Vào thư mục mã nguồn trên VPS:
+### 3.1 Clone mã nguồn về thư mục `/var/www/thanhle`:
 ```bash
+sudo mkdir -p /var/www
+cd /var/www
+git clone https://github.com/Hungmai06/thanhle.git thanhle
 cd /var/www/thanhle
-git pull origin main
 ```
 
-*(Nếu là server mới chưa clone repo: `cd /var/www && git clone https://github.com/Hungmai06/thanhle.git thanhle && cd thanhle`)*
+> 💡 *Nếu bạn đang làm việc trên branch khác `main` (ví dụ `redesign/affiliateshoppe`), hãy checkout branch đó:*
+> ```bash
+> git checkout redesign/affiliateshoppe
+> ```
+
+### 3.2 Tạo thư mục lưu trữ uploads:
+```bash
+mkdir -p /var/www/thanhle/Backend/uploads
+chmod -R 777 /var/www/thanhle/Backend/uploads
+```
+
+### 3.3 (Tùy chọn) Cấu hình API Key trong file `.env`:
+Tạo hoặc kiểm tra file `.env` ở thư mục gốc `/var/www/thanhle/.env` nếu cần truyền API Key cho TikTok/Shopee:
+```bash
+cat << 'EOF' > /var/www/thanhle/.env
+# API Key tra cứu Shopee (AddLiveTag)
+ADDLIVETAG_API_KEY=
+
+# API Key TikTok Shop (RioHub)
+RIOHUB_API_KEY=
+RIOHUB_CREATOR_USERNAME=hungrevieweverything
+RIOHUB_WEBHOOK_SECRET=
+
+# Google OAuth Client ID
+GOOGLE_CLIENT_ID=335312329426-br7u9qiohc9c8a5aqu7e3k4jlrrbptr6.apps.googleusercontent.com
+VITE_GOOGLE_CLIENT_ID=335312329426-br7u9qiohc9c8a5aqu7e3k4jlrrbptr6.apps.googleusercontent.com
+EOF
+```
 
 ---
 
 ## 🚀 BƯỚC 4: Khởi Chạy Hệ Thống Docker
 
-Thực hiện lệnh sau trên VPS tại thư mục `/var/www/thanhle` để build và chạy 3 containers:
+Tại thư mục `/var/www/thanhle`, chạy lệnh build và khởi động tất cả container:
 
 ```bash
+cd /var/www/thanhle
 docker compose up -d --build
 ```
 
-> ⚡ **Kết quả mong đợi:**
-> - MariaDB/MySQL khởi chạy trong container `thanhle_mysql` và tự động khởi tạo Database `affiliateshoppe`.
-> - Node.js Backend khởi chạy trong container `thanhle_backend`, tự động chạy Migrations/Seeds.
-> - Frontend Nginx khởi chạy trong container `thanhle_frontend`, mở cổng `8388`.
-
----
-
-## 🔍 BƯỚC 5: Kiểm Tra Trạng Thái Container
-
+### Kiểm tra trạng thái các container:
 ```bash
 docker compose ps
 ```
-Xem log nếu cần kiểm tra chi tiết:
+Cả 3 container phải có trạng thái **Up / Running**:
+* `thanhle_mysql` (MariaDB)
+* `thanhle_backend` (Node.js API)
+* `thanhle_frontend` (React Nginx - Cổng `8388`)
+
+### Xem log kiểm tra Backend kết nối Database thành công:
 ```bash
 docker compose logs -f backend
 ```
+*(Bấm `Ctrl + C` để thoát màn hình xem log)*
 
 ---
 
-## 🔒 BƯỚC 6: Cấu Hình Nginx Host & SSL HTTPS Cho `kiemxu.vn`
+## 🔒 BƯỚC 5: Cấu Hình Nginx Host & Chứng Chỉ SSL HTTPS
 
-Vì VPS đang chạy Web Server chính (Nginx) đón cổng 80 & 443 ngoài Internet, ta sẽ cấu hình Host Nginx chuyển tiếp (Reverse Proxy) vào Container Frontend (cổng 8388).
+Chúng ta cài đặt Nginx trực tiếp trên máy chủ VPS để đón các truy cập từ bên ngoài Internet qua cổng `80` (HTTP) & `443` (HTTPS) và chuyển tiếp vào container Frontend (cổng `8388`).
 
-### 6.1 Cài đặt Nginx & Certbot trên VPS (nếu chưa có):
+### 5.1 Cài đặt Nginx & Certbot:
 ```bash
 sudo apt install -y nginx certbot python3-certbot-nginx
 ```
 
-### 6.2 Tạo file cấu hình Nginx:
+### 5.2 Tạo file cấu hình Virtual Host cho `kiemxu.vn`:
 ```bash
 sudo nano /etc/nginx/sites-available/kiemxu.vn
 ```
 
-Dán nội dung cấu hình sau vào (lưu ý cổng **`8388`**):
+Dán toàn bộ nội dung cấu hình sau vào:
 
 ```nginx
 server {
     listen 80;
     server_name kiemxu.vn www.kiemxu.vn;
 
-    # Gzip Compression
+    # Tối ưu nén Gzip tăng tốc độ tải trang
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript image/svg+xml;
     gzip_min_length 256;
@@ -152,7 +194,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # Performance & WebSocket
+        # WebSocket & Performance
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -163,63 +205,115 @@ server {
 }
 ```
 
-### 6.3 Kích hoạt cấu hình Nginx:
+### 5.3 Kích hoạt Virtual Host & Tải lại Nginx:
 ```bash
-# Xoá liên kết cũ nếu trước đó từng tạo subdomain cũ
-sudo rm -f /etc/nginx/sites-enabled/thanhle.hutailoc.shop
-
-# Kích hoạt tên miền mới kiemxu.vn
 sudo ln -sf /etc/nginx/sites-available/kiemxu.vn /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### 6.4 Cài đặt SSL HTTPS miễn phí với Certbot:
+### 5.4 Cấp chứng chỉ SSL HTTPS miễn phí (Certbot):
 ```bash
 sudo certbot --nginx -d kiemxu.vn -d www.kiemxu.vn
 ```
-*(Certbot sẽ tự động cấp chứng chỉ HTTPS SSL cho cả `kiemxu.vn` và `www.kiemxu.vn` đồng thời tự gia hạn khi hết hạn).*
+* Nhập Email của bạn khi được hỏi để nhận thông báo gia hạn SSL.
+* Nhập `Y` đồng ý điều khoản.
+* Certbot sẽ tự động cấu hình HTTPS SSL và thiết lập tự động gia hạn khi chứng chỉ sắp hết hạn.
 
 ---
 
-## 🔄 BƯỚC 7: Cập Nhật Code Mỗi Khi Có Thay Đổi
+## 🔑 BƯỚC 6: Cấu Hình Google OAuth (Tránh lỗi 400 redirect_uri_mismatch)
 
-Khi bạn sửa code và push lên GitHub từ máy cá nhân (`git push origin redesign/affiliateshoppe:main`), bạn chỉ cần chạy 2 lệnh sau trên VPS:
+Để tính năng **"Đăng nhập bằng Google"** hoạt động trơn tru trên tên miền mới `https://kiemxu.vn`:
+
+1. Truy cập [Google Cloud Console - Credentials](https://console.cloud.google.com/apis/credentials).
+2. Chọn đúng Project và nhấp vào **OAuth 2.0 Client ID** đang dùng (Web Client).
+3. Tại mục **Authorized JavaScript origins (Nguồn gốc JavaScript được phép)**, nhấn **Add URI** và thêm:
+   * `https://kiemxu.vn`
+   * `https://www.kiemxu.vn`
+   * `http://localhost:5173` *(cho máy local test)*
+4. Tại mục **Authorized redirect URIs (URI chuyển hướng được phép)**, nhấn **Add URI** và thêm:
+   * `https://kiemxu.vn`
+   * `https://www.kiemxu.vn`
+   * `http://localhost:5173` *(cho máy local test)*
+5. Bấm nút **Save (Lưu)** ở cuối trang. *(Google sẽ mất khoảng 1 - 5 phút để cập nhật cấu hình toàn cầu).*
+
+---
+
+## 📱 BƯỚC 7: Cấu Hình Webhook RioHub (TikTok Shop)
+
+Nếu bạn có sử dụng đồng bộ đơn hàng tự động từ **RioHub (riohub.vn)**:
+1. Đăng nhập vào trang quản trị RioHub của bạn.
+2. Đi tới phần **Webhook Settings**.
+3. Điền **Webhook URL**:
+   ```
+   https://kiemxu.vn/api/tiktok/webhook
+   ```
+4. Chọn các sự kiện: `order.created`, `order.settled`, `order.refunded`.
+5. Bấm **Lưu cài đặt**.
+
+---
+
+## 🔄 BƯỚC 8: Quy Trình Cập Nhật Code Mỗi Khi Có Bản Mới
+
+Mỗi khi bạn sửa code ở máy tính cá nhân và push lên GitHub, để cập nhật lên server, chỉ cần SSH vào VPS và chạy cụm lệnh sau:
 
 ```bash
 cd /var/www/thanhle
-git pull origin main
+git pull
 docker compose up -d --build
 ```
-*Toàn bộ dữ liệu tài khoản, số dư, đơn hàng trong MySQL được bảo toàn tuyệt đối không bị mất.*
+> 🛡️ **Bảo toàn dữ liệu:**
+> Toàn bộ dữ liệu thành viên, mật khẩu, số dư ví, lịch sử đơn hàng và lượt click được lưu trữ an toàn trong Docker Volume `thanhle_mysql_data`, hoàn toàn **không bị ảnh hưởng hay mất dữ liệu** khi rebuild code!
 
 ---
 
-## 🔑 BƯỚC 8: Cấu Hình Đăng Nhập Bằng Google Cho Tên Miền kiemxu.vn
+## 🗄️ BƯỚC 9: Hướng Dẫn Di Chuyển / Khôi Phục Dữ Liệu Database Cũ
 
-Để tính năng **"Đăng nhập bằng Google"** hoạt động trơn tru trên `https://kiemxu.vn`:
+Nếu bạn có file backup cơ sở dữ liệu từ server cũ và muốn chuyển sang server mới này:
 
-1. Truy cập [Google Cloud Console - Credentials](https://console.cloud.google.com/apis/credentials).
-2. Nhấp vào **OAuth 2.0 Client ID** mà dự án đang dùng (Web Client).
-3. Tại mục **Authorized JavaScript origins**, thêm:
-   - `https://kiemxu.vn`
-   - `https://www.kiemxu.vn`
-   - `http://localhost:5173` *(cho máy local test)*
-4. Tại mục **Authorized redirect URIs**, thêm:
-   - `https://kiemxu.vn`
-   - `https://www.kiemxu.vn`
-   - `http://localhost:5173`
-5. Bấm **Save (Lưu)**.
+### 1. Xuất Database từ server cũ (nếu cần):
+```bash
+docker exec thanhle_mysql mysqldump -u root -proot_secure_password_123 affiliateshoppe > /root/backup_affiliateshoppe.sql
+```
+
+### 2. Copy file sang server mới:
+```bash
+scp /root/backup_affiliateshoppe.sql root@<IP_SERVER_MOI>:/var/www/thanhle/
+```
+
+### 3. Nhập dữ liệu vào Database trên server mới:
+```bash
+docker exec -i thanhle_mysql mysql -u root -proot_secure_password_123 affiliateshoppe < /var/www/thanhle/backup_affiliateshoppe.sql
+```
+
+### 4. Đồng bộ lại số dư người dùng theo dữ liệu vừa khôi phục:
+Đăng nhập vào tài khoản Admin trên web (`https://kiemxu.vn`), vào mục **Quản lý thành viên** bấm nút **"Đồng bộ tất cả số dư"** để hệ thống tính toán lại chính xác 100%.
 
 ---
 
-## 🗄️ BƯỚC 9: Lệnh Sao Lưu & Khôi Phục Database (Nếu Cần)
+## 🛠️ BƯỚC 10: Lệnh Tiện Ích & Xử Lý Sự Cố Thường Gặp
 
-- **Sao lưu Database**:
+* **Xem log thời gian thực của Backend:**
   ```bash
-  docker exec thanhle_mysql mysqldump -u root -proot_secure_password_123 affiliateshoppe > /var/www/backup_$(date +%F).sql
+  docker logs -f thanhle_backend --tail 100
   ```
-- **Khôi phục Database**:
+* **Khởi động lại toàn bộ hệ thống:**
   ```bash
-  docker exec -i thanhle_mysql mysql -u root -proot_secure_password_123 affiliateshoppe < /var/www/backup_xxx.sql
+  cd /var/www/thanhle && docker compose restart
+  ```
+* **Dừng toàn bộ hệ thống:**
+  ```bash
+  cd /var/www/thanhle && docker compose down
+  ```
+* **Kiểm tra dung lượng ổ đĩa và RAM:**
+  ```bash
+  df -h
+  free -h
+  ```
+* **Nếu Nginx báo lỗi 502 Bad Gateway:**
+  Kiểm tra xem container frontend có đang chạy cổng 8388 không:
+  ```bash
+  docker compose ps
+  curl -I http://127.0.0.1:8388
   ```
