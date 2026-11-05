@@ -47,7 +47,6 @@ async function initializeDatabase() {
   const dbType = process.env.DB_TYPE || 'sqlite';
 
   if (dbType === 'mysql') {
-    console.log('Connecting to MySQL Database...');
     const host = process.env.DB_HOST || 'localhost';
     const port = parseInt(process.env.DB_PORT || '3306');
     const user = process.env.DB_USER || 'root';
@@ -336,7 +335,6 @@ async function initializeDatabase() {
         INSERT INTO system_settings (id, website_name, support_phone, support_zalo, support_facebook, shopee_affiliate_id, commission_percentage, cashback_percentage)
         VALUES (1, 'Hoàn Tiền Mua Sắm', '0988.888.888', 'https://zalo.me/g/hoantienmuasam', 'https://facebook.com/hoantienmuasam', '173401900099', 10.0, 50.0)
       `);
-      console.log('Seeded default system settings for MySQL.');
     }
     await pool.query("UPDATE system_settings SET website_name = 'Hoàn Tiền Mua Sắm' WHERE id = 1");
 
@@ -348,7 +346,6 @@ async function initializeDatabase() {
         INSERT INTO users (id, name, email, password_hash, phone, avatar, role, status)
         VALUES ('ADM002', 'Khoa Ho', 'khoahodrive0604@gmail.com', ?, '', '', 'admin', 'active')
       `, [realAdminHash]);
-      console.log('Seeded real admin: khoahodrive0604@gmail.com');
     }
 
     // Truncate decimal places in existing orders and users
@@ -362,7 +359,6 @@ async function initializeDatabase() {
       await wrapper.run('UPDATE users SET referral_earnings = FLOOR(referral_earnings) WHERE referral_earnings IS NOT NULL');
     } catch (e) { }
 
-    console.log(`MySQL connected at: ${host}:${port}, database: ${dbName}`);
     return wrapper;
   } else {
     // SQLite configuration
@@ -372,7 +368,7 @@ async function initializeDatabase() {
       driver: sqlite3.Database
     });
 
-    console.log(`SQLite database connected at: ${dbPath}`);
+    return db;
 
     // High Concurrency SQLite PRAGMAs (WAL mode, cache, busy timeout)
     await db.exec(`
@@ -639,7 +635,6 @@ async function initializeDatabase() {
         INSERT INTO system_settings (id, website_name, support_phone, support_zalo, support_facebook, shopee_affiliate_id, commission_percentage, cashback_percentage)
         VALUES (1, 'Hoàn Tiền Mua Sắm', '0988.888.888', 'https://zalo.me/g/hoantienmuasam', 'https://facebook.com/hoantienmuasam', '173401900099', 10.0, 50.0)
       `);
-      console.log('Seeded default system settings for SQLite.');
     }
     await db.run("UPDATE system_settings SET website_name = 'Hoàn Tiền Mua Sắm' WHERE id = 1");
 
@@ -651,7 +646,6 @@ async function initializeDatabase() {
         INSERT INTO users (id, name, email, password_hash, phone, avatar, role, status)
         VALUES ('ADM001', 'ADMIN', 'thichung1564@gmail.com', ?, '', '', 'admin', 'active')
       `, [realAdminHash]);
-      console.log('Seeded real admin: khoahodrive0604@gmail.com');
     }
 
     // Truncate decimal places in existing orders and users
@@ -675,7 +669,6 @@ async function getDatabase() {
     while (retries > 0) {
       try {
         dbInstance = await initializeDatabase();
-        console.log('✅ Database successfully initialized and connected!');
         break;
       } catch (err) {
         retries--;

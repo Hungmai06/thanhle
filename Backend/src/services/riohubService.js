@@ -174,7 +174,6 @@ async function executeRiohubRequest(endpoint, options = {}) {
 
       // ĐÃ NHẬN ĐƯỢC HTTP RESPONSE TỪ RIOHUB -> Lưu domain này làm domain mặc định
       if (domainIdx !== activeDomainIndex) {
-        console.log(`[RioHub] Đã chuyển sang tên miền hoạt động ổn định: ${baseDomain}`);
         activeDomainIndex = domainIdx;
       }
 

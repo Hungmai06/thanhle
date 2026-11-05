@@ -442,8 +442,6 @@ async function handleTikTokWebhook(req, res) {
     const eventId = rawBody.event_id || rawBody.id;
     const orderData = rawBody.data || rawBody.order || rawBody;
 
-    console.log(`[RioHub Webhook] Nhận sự kiện: ${event} (Event ID: ${eventId})`);
-
     const orderId = String(orderData.order_id || orderData.id || '').trim();
     if (!orderId) {
       console.warn('[RioHub Webhook] Dữ liệu đơn thiếu order_id');
@@ -547,7 +545,6 @@ async function handleTikTokWebhook(req, res) {
          WHERE id = ?`,
         [orderStatus, orderAmount, orderAmount, finalCommission, finalCommission, estimatedCashback, realCashback, orderId]
       );
-      console.log(`[TikTok Webhook] Đã cập nhật trạng thái đơn ${orderId} -> ${orderStatus} (Hoàn dự kiến: ${estimatedCashback}, Thực nhận: ${realCashback})`);
     } else if (pendingOrder) {
       await db.run(
         `UPDATE tiktok_orders
@@ -583,7 +580,6 @@ async function handleTikTokWebhook(req, res) {
           pendingOrder.id
         ]
       );
-      console.log(`[TikTok Webhook] Đã cập nhật đơn chờ ${pendingOrder.id} -> mã thật ${orderId} (${orderStatus})`);
     } else {
       await db.run(
         `INSERT INTO tiktok_orders (
@@ -606,13 +602,11 @@ async function handleTikTokWebhook(req, res) {
           `TikTok Shop | SubID: ${subId}`
         ]
       );
-      console.log(`[TikTok Webhook] Đã ghi nhận đơn hàng mới ${orderId} (User: ${targetUserId || 'Ẩn danh'}, Trạng thái: ${orderStatus})`);
     }
 
     // Nếu đơn thuộc về user, tự động đồng bộ lại số dư ví ngay lập tức!
     if (targetUserId) {
       await recalculateUserBalances(db, [targetUserId]);
-      console.log(`[RioHub Webhook] Đã cập nhật số dư cho User ID: ${targetUserId}`);
     }
   } catch (err) {
     console.error('Lỗi bất đồng bộ khi xử lý Webhook RioHub:', err);
@@ -1057,10 +1051,7 @@ async function runAutoSyncTikTokJob() {
 
     const orderList = data?.orders || data?.data || [];
     if (orderList.length > 0) {
-      const result = await processTikTokOrders(db, orderList);
-      if (result.importedCount > 0 || result.updatedCount > 0) {
-        console.log(`[TikTok Auto-Sync API] Tự động đồng bộ: +${result.importedCount} mới, ^${result.updatedCount} cập nhật (${result.settledCount} đơn hoàn thành đối soát).`);
-      }
+      await processTikTokOrders(db, orderList);
     }
   } catch (err) {
     console.warn('[TikTok Auto-Sync API Error]:', err.message);
