@@ -81,7 +81,7 @@ export default function InstallPWA() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
             transition={{ duration: 0.3 }}
-            className="fixed bottom-4 left-4 right-4 md:left-auto md:right-6 md:max-w-md z-40 bg-white dark:bg-slate-900 border border-primary/30 rounded-[20px] p-4 shadow-2xl backdrop-blur-lg flex items-center justify-between gap-4"
+            className="fixed bottom-20 left-3 right-3 md:bottom-6 md:left-auto md:right-6 md:max-w-md z-40 bg-white dark:bg-slate-900 border border-primary/30 rounded-[20px] p-4 shadow-2xl backdrop-blur-lg flex items-center justify-between gap-4"
           >
             <div className="flex items-center gap-3">
               <img src="/icon.png" alt="Hũ tài lộc" className="w-12 h-12 object-contain rounded-2xl shadow-sm shrink-0" />

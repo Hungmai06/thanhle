@@ -9,7 +9,7 @@ Tài liệu này hướng dẫn chi tiết từng bước từ A đến Z để 
 | Thông tin | Giá trị triển khai |
 | :--- | :--- |
 | **Tên miền chính** | `https://kiemxu.vn` và `https://www.kiemxu.vn` |
-| **Cổng SSH (Custom)** | Port `2003` (thay cho port mặc định 22) |
+| **Cổng SSH** | Port `22` (Mặc định) |
 | **Thư mục dự án** | `/var/www/thanhle` |
 | **Database Container** | `thanhle_mysql` (MariaDB 10.11 / MySQL 8.0, Port nội bộ `3306`) |
 | **Backend Container** | `thanhle_backend` (Node.js API, Port nội bộ `5000`) |
@@ -42,9 +42,9 @@ Trước khi cấu hình trên VPS, truy cập bảng quản lý DNS tên miền
 
 ## 💻 BƯỚC 2: Chuẩn Bị & Cài Đặt Môi Trường Trên Server Mới
 
-Đăng nhập vào VPS qua SSH bằng quyền `root` (với cổng custom **`2003`**):
+Đăng nhập vào VPS qua SSH bằng quyền `root` (cổng mặc định 22):
 ```bash
-ssh -p 2003 root@<IP_SERVER_CUA_BAN>
+ssh root@<IP_SERVER_CUA_BAN>
 ```
 
 ### 2.1 Cập nhật hệ điều hành:
@@ -84,10 +84,10 @@ docker compose version
 ```
 
 ### 2.4 Mở tường lửa (Firewall UFW):
-> ⚠️ **Cực kỳ quan trọng:** Vì bạn đã đổi cổng SSH sang **`2003`**, bắt buộc phải mở cổng `2003/tcp` trước khi kích hoạt UFW để không bị khóa quyền truy cập VPS:
+> ⚠️ **Lưu ý:** Bắt buộc phải mở cổng SSH (port 22) trước khi kích hoạt UFW để không bị khóa quyền truy cập VPS:
 ```bash
-# Mở cổng SSH custom 2003
-sudo ufw allow 2003/tcp
+# Mở cổng SSH mặc định (port 22)
+sudo ufw allow 22/tcp
 
 # Mở cổng Web HTTP & HTTPS
 sudo ufw allow 80/tcp
@@ -285,9 +285,9 @@ Nếu bạn có file backup cơ sở dữ liệu từ server cũ và muốn chuy
 docker exec thanhle_mysql mysqldump -u root -proot_secure_password_123 affiliateshoppe > /root/backup_affiliateshoppe.sql
 ```
 
-### 2. Copy file sang server mới (lưu ý cờ cổng `-P 2003` viết hoa):
+### 2. Copy file sang server mới:
 ```bash
-scp -P 2003 /root/backup_affiliateshoppe.sql root@<IP_SERVER_MOI>:/var/www/thanhle/
+scp /root/backup_affiliateshoppe.sql root@<IP_SERVER_MOI>:/var/www/thanhle/
 ```
 
 ### 3. Nhập dữ liệu vào Database trên server mới:
