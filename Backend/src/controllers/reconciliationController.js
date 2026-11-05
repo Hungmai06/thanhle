@@ -696,8 +696,12 @@ function detectSeparator(filePath) {
 }
 
 // Map Shopee CSV Status to System Status
+// - Hoàn thành -> approved (Đã duyệt)
+// - Hủy / Từ chối -> rejected (Đơn hủy)
+// - Hoàn hàng / Trả hàng -> returned (Đơn hoàn)
+// - Khớp từ CSV sàn nhưng chưa hoàn thành -> received (Đã tiếp nhận)
 function mapShopeeStatus(shopeeStatus) {
-  if (!shopeeStatus) return 'pending';
+  if (!shopeeStatus) return 'received';
   const status = shopeeStatus.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
   if (
@@ -731,7 +735,7 @@ function mapShopeeStatus(shopeeStatus) {
     return 'rejected';
   }
 
-  return 'pending';
+  return 'received';
 }
 
 /**

@@ -15,12 +15,12 @@ import {
 import { useAppStore } from '../../store/appStore';
 import type { Order } from '../../store/appStore';
 import { toast } from 'sonner';
+import { formatVietnamDateTime } from '../../utils/dateTime';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip,
   PieChart, Pie, Cell, Legend
 } from 'recharts';
 import ReferralDashboardView from '../referral/ReferralDashboardView';
-import { OrderExistenceBadge } from '../../utils/orderExistence';
 
 interface ReferralStats {
   clicks: number;
@@ -232,14 +232,22 @@ export default function UserDashboard() {
     }
   };
 
-  const getStatusBadge = (status: Order['status']) => {
-    switch (status) {
-      case 'pending': return <Badge variant="info">Đang chờ đối soát</Badge>;
-      case 'approved': return <Badge variant="success">Hoàn thành</Badge>;
-      case 'rejected': return <Badge variant="danger">Hủy</Badge>;
-      case 'returned': return <Badge variant="warning" className="bg-orange-50 text-orange-600 border-orange-200">Hoàn hàng</Badge>;
-      case 'paid': return <Badge variant="warning">Đã thanh toán</Badge>;
+  const getStatusBadge = (status: Order['status'] | string, orderId?: string) => {
+    const isPendingClick = orderId && (orderId.startsWith('CLK') || orderId.startsWith('TT'));
+
+    if (status === 'approved' || status === 'paid') {
+      return <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white border-none text-[11px] font-bold">Đã duyệt</Badge>;
     }
+    if (status === 'received' || (status === 'pending' && !isPendingClick)) {
+      return <Badge className="bg-blue-600 hover:bg-blue-700 text-white border-none text-[11px] font-bold">Đã tiếp nhận</Badge>;
+    }
+    if (status === 'returned') {
+      return <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-none text-[11px] font-bold">Đơn hoàn</Badge>;
+    }
+    if (status === 'rejected') {
+      return <Badge className="bg-rose-500 hover:bg-rose-600 text-white border-none text-[11px] font-bold">Đơn hủy</Badge>;
+    }
+    return <Badge className="bg-amber-500 hover:bg-amber-600 text-white border-none text-[11px] font-bold">Chờ đối soát</Badge>;
   };
 
   const getTimelineStepIndex = (status: Order['status']) => {
@@ -436,7 +444,6 @@ export default function UserDashboard() {
                           <TableHead>Tên Sản Phẩm</TableHead>
                           <TableHead className="text-right">Giá Trị</TableHead>
                           <TableHead className="text-right">Ước Tính Hoàn</TableHead>
-                          <TableHead className="text-center">Tồn tại</TableHead>
                           <TableHead>Trạng Thái</TableHead>
                           <TableHead>Thời Gian</TableHead>
                         </TableRow>
@@ -449,16 +456,8 @@ export default function UserDashboard() {
                             <TableCell className="text-right font-bold text-primary">
                               {Math.floor(order.estimatedCashback).toLocaleString('vi-VN')}đ
                             </TableCell>
-                            <TableCell className="text-center whitespace-nowrap">
-                              <OrderExistenceBadge
-                                status={order.status}
-                                createdTime={order.createdTime}
-                                id={order.id}
-                                size="sm"
-                              />
-                            </TableCell>
-                            <TableCell>{getStatusBadge(order.status)}</TableCell>
-                            <TableCell className="text-xs text-text-secondary font-medium">{order.createdTime}</TableCell>
+                            <TableCell>{getStatusBadge(order.status, order.id)}</TableCell>
+                            <TableCell className="text-xs text-text-secondary font-medium whitespace-nowrap">{formatVietnamDateTime(order.createdTime)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -542,7 +541,6 @@ export default function UserDashboard() {
                           <TableHead className="text-right">Số Tiền Đơn</TableHead>
                           <TableHead className="text-right">Tiền Hoàn Dự Kiến</TableHead>
                           <TableHead className="text-right">Thực Nhận</TableHead>
-                          <TableHead className="text-center">Tồn tại</TableHead>
                           <TableHead>Trạng Thái</TableHead>
                           <TableHead>Thời Gian</TableHead>
                         </TableRow>
@@ -580,15 +578,8 @@ export default function UserDashboard() {
                               <TableCell className="text-right font-bold text-success">
                                 {order.realCashback ? `${Math.floor(order.realCashback).toLocaleString('vi-VN')}đ` : '-'}
                               </TableCell>
-                              <TableCell className="text-center whitespace-nowrap">
-                                <OrderExistenceBadge
-                                  status={order.status}
-                                  createdTime={order.createdTime}
-                                  id={order.id}
-                                />
-                              </TableCell>
-                              <TableCell>{getStatusBadge(order.status)}</TableCell>
-                              <TableCell className="text-xs text-text-secondary font-medium">{order.createdTime}</TableCell>
+                              <TableCell>{getStatusBadge(order.status, order.id)}</TableCell>
+                              <TableCell className="text-xs text-text-secondary font-medium whitespace-nowrap">{formatVietnamDateTime(order.createdTime)}</TableCell>
                             </TableRow>
                           ))}
                       </TableBody>
@@ -712,7 +703,7 @@ export default function UserDashboard() {
                             <TableCell className="font-semibold">{item.bankName}</TableCell>
                             <TableCell className="font-mono">{item.accountNumber}</TableCell>
                             <TableCell className="font-semibold text-xs">{item.accountHolder}</TableCell>
-                            <TableCell className="text-xs text-text-secondary font-medium">{item.requestDate}</TableCell>
+                            <TableCell className="text-xs text-text-secondary font-medium whitespace-nowrap">{formatVietnamDateTime(item.requestDate)}</TableCell>
                             <TableCell>
                               {item.status === 'pending' && <Badge variant="info">Chờ duyệt</Badge>}
                               {item.status === 'approved' && <Badge variant="success">Đã chuyển tiền</Badge>}
@@ -1162,9 +1153,9 @@ export default function UserDashboard() {
               <div className="flex justify-between items-center pr-6">
                 <div>
                   <DialogTitle>Chi tiết đơn hàng {selectedOrder.id}</DialogTitle>
-                  <p className="text-[10px] text-text-secondary font-medium">Khởi tạo lúc: {selectedOrder.createdTime}</p>
+                  <p className="text-[10px] text-text-secondary font-medium">Khởi tạo lúc: {formatVietnamDateTime(selectedOrder.createdTime)}</p>
                 </div>
-                {getStatusBadge(selectedOrder.status)}
+                {getStatusBadge(selectedOrder.status, selectedOrder.id)}
               </div>
             </DialogHeader>
 

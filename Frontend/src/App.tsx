@@ -13,6 +13,7 @@ const TrackingPage = lazy(() => import('./features/landing/TrackingPage'));
 const WalletPage = lazy(() => import('./features/landing/WalletPage'));
 const SupportPage = lazy(() => import('./features/landing/SupportPage'));
 const ReferralPage = lazy(() => import('./features/landing/ReferralPage'));
+const NotificationsPage = lazy(() => import('./features/landing/NotificationsPage'));
 const AuthPages = lazy(() => import('./features/auth/AuthPages'));
 const AdminPanel = lazy(() => import('./features/admin/AdminPanel'));
 
@@ -130,6 +131,7 @@ function App() {
             <Route path="/wallet" element={<WalletPage />} />
             <Route path="/support" element={<SupportPage />} />
             <Route path="/referral" element={<ReferralPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
           </Route>
           
           {/* Authentication flow (Login, Register, Forgot, Reset, OTP) */}

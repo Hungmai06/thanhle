@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '../../store/appStore';
 import {
   ShoppingBag, Menu, X, Wallet, Search, HelpCircle,
-  Users, LogOut, ShieldCheck, Sparkles, Phone, MessageSquare, Home
+  Users, LogOut, ShieldCheck, Sparkles, Phone, MessageSquare, Home,
+  ChevronRight, Banknote, Bell
 } from 'lucide-react';
 import { Button } from '../ui/core';
 import { toast } from 'sonner';
@@ -66,8 +67,16 @@ function TikTokBrandIcon({ className = "w-5 h-5" }: { className?: string }) {
 export default function PublicLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, logout, settings, openAuthModal, userStats } = useAppStore();
+  const { currentUser, logout, settings, openAuthModal, userStats, notifications, fetchNotifications } = useAppStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchNotifications();
+    }
+  }, [currentUser, fetchNotifications]);
+
+  const unreadNotifCount = notifications?.filter(n => !n.read).length || 0;
 
   const handleLogout = () => {
     logout();
@@ -114,6 +123,13 @@ export default function PublicLayout() {
           badge: 'Hoa hồng'
         },
         {
+          name: 'Thông báo',
+          path: '/notifications',
+          icon: Bell,
+          badge: unreadNotifCount > 0 ? `${unreadNotifCount} mới` : null,
+          badgeColor: 'bg-orange-50 text-[#EE4D2D] border border-orange-200'
+        },
+        {
           name: 'Hỏi đáp & Hỗ trợ',
           path: '/support',
           icon: HelpCircle,
@@ -131,7 +147,7 @@ export default function PublicLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col font-poppins relative overflow-x-hidden">
+    <div className="min-h-screen bg-bg flex flex-col font-poppins relative overflow-x-clip">
       {/* AMBIENT BACKGROUND GLOWS (radial-gradient thay vì blur filter để Safari không bị lag khi cuộn) */}
       <div
         className="fixed top-0 right-0 w-[700px] h-[700px] -z-10 pointer-events-none"
@@ -299,38 +315,31 @@ export default function PublicLayout() {
       </aside>
 
       {/* ======================================================== */}
-      {/* 2. MOBILE TOPBAR & DRAWER (MÀN HÌNH NHỎ)                 */}
+      {/* 2. MOBILE TOPBAR & DROPDOWN (MÀN HÌNH NHỎ)               */}
       {/* ======================================================== */}
-      <header className="sticky top-0 z-30 md:hidden bg-white/95 backdrop-blur-md border-b border-border shadow-xs px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setMobileMenuOpen(true)}
-            className="p-2 -ml-2 rounded-xl text-text hover:bg-slate-100 transition-colors"
-            aria-label="Mở Menu"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
+      {/* THANH TOPBAR CỐ ĐỊNH TRÊN ĐIỆN THOẠI (FIXED TOP - CHUẨN ẢNH) */}
+      <header className="fixed top-0 left-0 right-0 z-50 md:hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-border shadow-xs px-3 h-16 flex items-center justify-between">
+        {/* LOGO BÊN TRÁI */}
+        <Link to="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2">
+          <div className="gradient-bg p-1.5 rounded-[10px] text-white shadow-sm">
+            <ShoppingBag className="h-5 w-5" />
+          </div>
+          <span className="text-base font-extrabold tracking-tight text-text">
+            {settings.websiteName || "SanHoanTien.com"}
+          </span>
+        </Link>
 
-          <Link to="/" className="flex items-center gap-2">
-            <div className="gradient-bg p-1.5 rounded-[10px] text-white shadow-sm">
-              <ShoppingBag className="h-5 w-5" />
-            </div>
-            <span className="text-base font-extrabold tracking-tight text-text">
-              {settings.websiteName || "Hoàn Tiền Mua Sắm"}
-            </span>
-          </Link>
-        </div>
-
+        {/* CỤM NÚT BÊN PHẢI: VÍ TIỀN & NÚT 3 GẠCH CAM / ĐÓNG X */}
         <div className="flex items-center gap-2">
           {currentUser ? (
             <div
               onClick={() => navigate('/wallet')}
-              className="flex items-center gap-1.5 bg-orange-50 border border-orange-200/60 px-2.5 py-1 rounded-full cursor-pointer"
+              className="flex items-center gap-1.5 bg-orange-50 border border-orange-200/60 px-2.5 py-1 rounded-full cursor-pointer active:scale-95 transition-transform"
             >
-              <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center font-bold text-xs">
-                {currentUser.name.charAt(0).toUpperCase()}
+              <div className="w-5 h-5 rounded-full bg-[#EE4D2D] text-white flex items-center justify-center font-bold text-[10px]">
+                {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
               </div>
-              <span className="text-xs font-bold text-primary">
+              <span className="text-[11px] font-bold text-[#EE4D2D]">
                 {(currentUser.balance || userStats?.availableBalance || 0).toLocaleString('vi-VN')} đ
               </span>
             </div>
@@ -338,146 +347,227 @@ export default function PublicLayout() {
             <Button
               size="sm"
               onClick={() => openAuthModal('login')}
-              className="text-xs px-3 py-1.5 font-bold"
+              className="text-xs px-3 py-1.5 font-bold bg-[#EE4D2D] hover:bg-[#d03d2b] text-white rounded-xl shadow-xs"
             >
               Đăng nhập
             </Button>
           )}
+
+          {/* NÚT 3 GẠCH CAM (KHI ĐÓNG) HOẶC NÚT [X] ĐỎ CAM (KHI MENU MỞ) */}
+          {mobileMenuOpen ? (
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(false)}
+              className="w-10 h-10 rounded-xl bg-[#E84A36] hover:bg-[#d03d2b] text-white flex items-center justify-center shadow-xs active:scale-95 transition-all shrink-0 cursor-pointer"
+              aria-label="Đóng menu"
+            >
+              <X className="w-5 h-5 stroke-[2.5]" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="w-10 h-10 rounded-xl bg-[#EE4D2D] hover:bg-[#d03d2b] text-white flex items-center justify-center shadow-xs active:scale-95 transition-all shrink-0 cursor-pointer"
+              aria-label="Mở menu"
+            >
+              <Menu className="w-5 h-5 text-white stroke-[2.5]" />
+            </button>
+          )}
         </div>
       </header>
 
-      {/* MOBILE SLIDE-OVER DRAWER (THANH LEFT TRÊN MOBILE) */}
+      {/* KHOẢNG ĐỆM CHIỀU CAO CHO FIXED TOPBAR TRÊN MOBILE */}
+      <div className="h-16 md:hidden shrink-0" aria-hidden="true" />
+
+      {/* MOBILE DROPDOWN CARD (XỔ NGAY DƯỚI HEADER - HOÀN TOÀN KHÔNG CÓ NỀN MỜ ĐEN PHÍA SAU) */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
-          {/* Backdrop */}
+        <div className="fixed inset-0 z-40 md:hidden pointer-events-none">
+          {/* Lớp phủ trong suốt (bg-transparent, KHÔNG mờ, KHÔNG đen, trang web phía sau sáng 100%) để click ra ngoài là đóng */}
           <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+            className="absolute inset-0 bg-transparent pointer-events-auto"
             onClick={() => setMobileMenuOpen(false)}
           />
 
-          {/* Drawer content */}
-          <div className="relative w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col justify-between z-10 animate-in slide-in-from-left duration-200">
-            <div className="flex flex-col flex-1 overflow-y-auto">
-              {/* Drawer Top */}
-              <div className="p-4 border-b border-border/80 flex items-center justify-between">
-                <Link to="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2.5">
-                  <div className="gradient-bg p-2 rounded-[12px] text-white">
-                    <ShoppingBag className="h-5 w-5" />
+          {/* Khung Menu xổ ra dạng Card bo tròn 3xl, nằm ngay dưới Header (top-[68px]), bóng đổ sang trọng */}
+          <div className="relative top-[68px] mx-3 max-w-sm sm:mx-auto bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200/90 dark:border-slate-800 pointer-events-auto animate-in slide-in-from-top-2 fade-in duration-150 flex flex-col overflow-hidden max-h-[calc(100vh-85px)] z-10">
+            {/* Nội dung danh sách menu cuộn nhẹ nếu chiều cao nhỏ */}
+            <div className="p-3.5 flex flex-col gap-1.5 overflow-y-auto">
+              {/* 1. Thẻ thông tin thành viên (User Card chuẩn ảnh) */}
+              <div className="pb-1">
+                {currentUser ? (
+                  <div
+                    onClick={() => { navigate('/wallet'); setMobileMenuOpen(false); }}
+                    className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 flex items-center justify-between cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-2xs"
+                  >
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="w-11 h-11 rounded-2xl bg-[#EE4D2D] text-white flex items-center justify-center font-black text-base shadow-xs shrink-0 uppercase">
+                        {currentUser.name ? currentUser.name.charAt(0) : 'U'}
+                      </div>
+                      <div className="text-left overflow-hidden">
+                        <p className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                          {currentUser.name}
+                        </p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                          {currentUser.email || `Số dư: ${(currentUser.balance || userStats?.availableBalance || 0).toLocaleString('vi-VN')} đ`}
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                   </div>
-                  <span className="text-sm font-extrabold tracking-tight text-text">
-                    {settings.websiteName || "Hoàn Tiền Mua Sắm"}
-                  </span>
-                </Link>
+                ) : (
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-orange-50 to-amber-50 dark:from-slate-800 dark:to-slate-800 border border-orange-100 dark:border-slate-700 flex items-center justify-between">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="w-10 h-10 rounded-xl bg-orange-100 text-[#EE4D2D] flex items-center justify-center font-black shrink-0">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <div className="text-left overflow-hidden">
+                        <p className="font-bold text-xs text-slate-900 dark:text-white">Chào bạn mới!</p>
+                        <p className="text-[10px] text-slate-500 truncate mt-0.5">Đăng nhập để nhận tiền hoàn</p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => { openAuthModal('login'); setMobileMenuOpen(false); }}
+                      className="text-xs px-3 py-1.5 h-8 font-bold bg-[#EE4D2D] hover:bg-[#d03d2b] text-white rounded-xl shadow-xs shrink-0"
+                    >
+                      Đăng nhập
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Danh sách các liên kết điều hướng (Chuẩn 100% theo ảnh mẫu) */}
+              <div className="flex flex-col gap-0.5">
+                {/* Trang chủ */}
                 <button
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-text hover:bg-slate-100"
+                  type="button"
+                  onClick={() => { navigate('/'); setMobileMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl transition-colors cursor-pointer text-left ${
+                    (location.pathname === '/' || location.pathname === '/shopee' || location.pathname === '/tiktok')
+                      ? 'bg-[#FFF5F3] dark:bg-orange-950/30 text-[#EE4D2D] font-bold'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium'
+                  }`}
                 >
-                  <X className="w-5 h-5" />
+                  <div className="flex items-center gap-3.5">
+                    <Home className={`w-5 h-5 shrink-0 ${
+                      (location.pathname === '/' || location.pathname === '/shopee' || location.pathname === '/tiktok')
+                        ? 'text-[#EE4D2D]'
+                        : 'text-slate-500 dark:text-slate-400'
+                    }`} />
+                    <span className="text-[13px]">Trang chủ</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
                 </button>
-              </div>
 
-              {/* Navigation Items in Drawer */}
-              <div className="p-3 flex flex-col gap-5">
-                {navItems.map((group, gIdx) => (
-                  <div key={gIdx} className="flex flex-col gap-1">
-                    <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-text-secondary/70">
-                      {group.group}
-                    </div>
-                    {group.items.map((item, iIdx) => {
-                      const active = isLinkActive(item.path, item.altPaths);
-                      const Icon = item.icon;
-                      return (
-                        <NavLink
-                          key={iIdx}
-                          to={item.path}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className={`group flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                            active
-                              ? 'bg-[#FFF2EB] text-primary shadow-xs border border-primary/20 font-bold'
-                              : 'text-slate-700 bg-white hover:bg-[#FFF2EB] hover:text-primary active:bg-[#FFF2EB] active:text-primary border border-transparent'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`p-1 rounded-lg transition-colors duration-200 ${active ? 'text-primary' : 'text-slate-500 group-hover:text-primary'}`}>
-                              <Icon className="w-4.5 h-4.5 shrink-0 transition-colors duration-200" />
-                            </div>
-                            <span className={`text-sm tracking-tight transition-colors duration-200 ${active ? 'font-bold text-primary' : 'font-medium text-slate-700 group-hover:text-primary'}`}>
-                              {item.name}
-                            </span>
-                          </div>
-                          {item.badge && (
-                            <span
-                              className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider transition-colors duration-200 ${
-                                active
-                                  ? 'bg-primary text-white shadow-2xs'
-                                  : item.badgeColor || 'bg-slate-100 text-slate-700 group-hover:bg-primary/15 group-hover:text-primary'
-                              }`}
-                            >
-                              {item.badge}
-                            </span>
-                          )}
-                        </NavLink>
-                      );
-                    })}
+                {/* Đơn hàng */}
+                <button
+                  type="button"
+                  onClick={() => { navigate('/tracking'); setMobileMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl transition-colors cursor-pointer text-left ${
+                    location.pathname === '/tracking'
+                      ? 'bg-[#FFF5F3] dark:bg-orange-950/30 text-[#EE4D2D] font-bold'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium'
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <ShoppingBag className={`w-5 h-5 shrink-0 ${location.pathname === '/tracking' ? 'text-[#EE4D2D]' : 'text-slate-500 dark:text-slate-400'}`} />
+                    <span className="text-[13px]">Đơn hàng</span>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+                </button>
 
-            {/* Mobile Drawer Bottom */}
-            <div className="p-4 border-t border-border/80 bg-slate-50">
-              {currentUser ? (
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xs">
-                        {currentUser.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="text-left">
-                        <p className="text-xs font-bold text-text truncate max-w-[130px]">{currentUser.name}</p>
-                        <span className="text-[10px] text-emerald-600 font-bold block">
-                          {(currentUser.balance || userStats?.availableBalance || 0).toLocaleString('vi-VN')} đ
-                        </span>
-                      </div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
-                      className="border-danger text-danger text-xs px-2 py-1"
-                    >
-                      Thoát
-                    </Button>
+                {/* Giới thiệu */}
+                <button
+                  type="button"
+                  onClick={() => { navigate('/referral'); setMobileMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl transition-colors cursor-pointer text-left ${
+                    location.pathname === '/referral'
+                      ? 'bg-[#FFF5F3] dark:bg-orange-950/30 text-[#EE4D2D] font-bold'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium'
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <Users className={`w-5 h-5 shrink-0 ${location.pathname === '/referral' ? 'text-[#EE4D2D]' : 'text-slate-500 dark:text-slate-400'}`} />
+                    <span className="text-[13px]">Giới thiệu</span>
                   </div>
-                  {currentUser.role === 'admin' && (
-                    <Button
-                      size="sm"
-                      onClick={() => { navigate('/admin'); setMobileMenuOpen(false); }}
-                      className="w-full text-xs font-bold mt-1"
-                    >
-                      Vào Dashboard Quản Trị
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => { openAuthModal('login'); setMobileMenuOpen(false); }}
-                    className="text-xs font-bold"
+                  <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+                </button>
+
+                {/* Rút tiền */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    if (!currentUser) {
+                      openAuthModal('login');
+                    } else {
+                      navigate('/wallet#withdraw');
+                      setTimeout(() => {
+                        const el = document.getElementById('withdraw-section');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }, 120);
+                    }
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl transition-colors cursor-pointer text-left ${
+                    location.pathname === '/wallet'
+                      ? 'bg-[#FFF5F3] dark:bg-orange-950/30 text-[#EE4D2D] font-bold'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium'
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <Wallet className={`w-5 h-5 shrink-0 ${location.pathname === '/wallet' ? 'text-[#EE4D2D]' : 'text-slate-500 dark:text-slate-400'}`} />
+                    <span className="text-[13px]">Rút tiền</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+                </button>
+
+                {/* Hỗ trợ & Hỏi đáp */}
+                <button
+                  type="button"
+                  onClick={() => { navigate('/support'); setMobileMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl transition-colors cursor-pointer text-left ${
+                    location.pathname === '/support'
+                      ? 'bg-[#FFF5F3] dark:bg-orange-950/30 text-[#EE4D2D] font-bold'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium'
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <HelpCircle className={`w-5 h-5 shrink-0 ${location.pathname === '/support' ? 'text-[#EE4D2D]' : 'text-slate-500 dark:text-slate-400'}`} />
+                    <span className="text-[13px]">Hỗ trợ & Hỏi đáp</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+                </button>
+
+                {/* Trang Quản Trị (Nếu là Admin) */}
+                {currentUser?.role === 'admin' && (
+                  <button
+                    type="button"
+                    onClick={() => { navigate('/admin'); setMobileMenuOpen(false); }}
+                    className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-primary hover:bg-orange-50 font-bold transition-colors cursor-pointer text-left"
                   >
-                    Đăng nhập
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => { openAuthModal('register'); setMobileMenuOpen(false); }}
-                    className="text-xs font-bold"
+                    <div className="flex items-center gap-3.5">
+                      <ShieldCheck className="w-5 h-5 shrink-0 text-primary" />
+                      <span className="text-[13px]">Trang Quản Trị</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-primary shrink-0" />
+                  </button>
+                )}
+
+                {/* Hàng Đăng xuất nếu đã đăng nhập */}
+                {currentUser && (
+                  <button
+                    type="button"
+                    onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                    className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-slate-700 dark:text-slate-200 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20 dark:hover:text-red-400 transition-colors font-medium text-left cursor-pointer"
                   >
-                    Đăng ký
-                  </Button>
-                </div>
-              )}
+                    <div className="flex items-center gap-3.5">
+                      <LogOut className="w-5 h-5 shrink-0 text-slate-500" />
+                      <span className="text-[13px]">Đăng xuất</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -512,6 +602,21 @@ export default function PublicLayout() {
 
             {currentUser ? (
               <div className="flex items-center gap-3">
+                {/* Nút Chuông thông báo desktop */}
+                <button
+                  type="button"
+                  onClick={() => navigate('/notifications')}
+                  className="relative p-2 rounded-xl text-slate-600 hover:text-primary hover:bg-slate-100 transition-colors cursor-pointer"
+                  title="Thông báo & Biến động số dư"
+                >
+                  <Bell className="w-5 h-5" />
+                  {unreadNotifCount > 0 && (
+                    <span className="absolute top-1 right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-[#EE4D2D] text-white text-[9px] font-black border-2 border-white shadow-xs">
+                      {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                    </span>
+                  )}
+                </button>
+
                 <button
                   onClick={() => navigate('/wallet')}
                   className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 hover:bg-emerald-100/70 transition-colors shadow-2xs"
@@ -551,12 +656,12 @@ export default function PublicLayout() {
         </header>
 
         {/* PAGE BODY */}
-        <main className="flex-grow">
+        <main className="flex-grow pb-20 md:pb-0">
           <Outlet />
         </main>
 
         {/* FOOTER */}
-        <footer className="bg-slate-900 text-white/90 pt-16 pb-12 border-t border-white/10 mt-auto">
+        <footer className="bg-slate-900 text-white/90 pt-16 pb-12 border-t border-white/10 mt-auto mb-16 md:mb-0">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
             <div className="flex flex-col gap-4 text-left">
               <div className="flex items-center gap-2.5">
@@ -613,6 +718,155 @@ export default function PublicLayout() {
           </div>
         </footer>
       </div>
+
+      {/* ======================================================== */}
+      {/* 4. MOBILE BOTTOM NAVIGATION BAR (FOOTER BAR ĐIỀU HƯỚNG) */}
+      {/* ======================================================== */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-2 h-16 flex items-center justify-around pb-[env(safe-area-inset-bottom,0px)]">
+        {/* 1. Trang chủ */}
+        {(() => {
+          const isHomeActive = (location.pathname === '/' || location.pathname === '/shopee' || location.pathname === '/tiktok') && !mobileMenuOpen;
+          return (
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                navigate('/');
+              }}
+              className="flex-1 flex flex-col items-center justify-center py-1 transition-all active:scale-95 cursor-pointer"
+            >
+              {isHomeActive ? (
+                <div className="w-9 h-9 rounded-2xl bg-[#EE4D2D] text-white flex items-center justify-center shadow-sm shadow-orange-500/30">
+                  <Home className="w-5 h-5 stroke-[2.4]" />
+                </div>
+              ) : (
+                <div className="w-9 h-9 flex items-center justify-center text-slate-400">
+                  <Home className="w-5 h-5 stroke-[1.8]" />
+                </div>
+              )}
+              <span className={`text-[11px] mt-0.5 ${isHomeActive ? 'font-bold text-[#EE4D2D]' : 'font-medium text-slate-500'}`}>
+                Trang chủ
+              </span>
+            </button>
+          );
+        })()}
+
+        {/* 2. Ví */}
+        {(() => {
+          const isWalletActive = location.pathname === '/wallet' && !location.hash.includes('withdraw') && !mobileMenuOpen;
+          return (
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                if (!currentUser) {
+                  openAuthModal('login');
+                } else {
+                  navigate('/wallet');
+                }
+              }}
+              className="flex-1 flex flex-col items-center justify-center py-1 transition-all active:scale-95 cursor-pointer"
+            >
+              {isWalletActive ? (
+                <div className="w-9 h-9 rounded-2xl bg-[#EE4D2D] text-white flex items-center justify-center shadow-sm shadow-orange-500/30">
+                  <Wallet className="w-5 h-5 stroke-[2.4]" />
+                </div>
+              ) : (
+                <div className="w-9 h-9 flex items-center justify-center text-slate-400">
+                  <Wallet className="w-5 h-5 stroke-[1.8]" />
+                </div>
+              )}
+              <span className={`text-[11px] mt-0.5 ${isWalletActive ? 'font-bold text-[#EE4D2D]' : 'font-medium text-slate-500'}`}>
+                Ví
+              </span>
+            </button>
+          );
+        })()}
+
+        {/* 3. Đơn hàng */}
+        {(() => {
+          const isOrdersActive = location.pathname === '/tracking' && !mobileMenuOpen;
+          return (
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                navigate('/tracking');
+              }}
+              className="flex-1 flex flex-col items-center justify-center py-1 transition-all active:scale-95 cursor-pointer"
+            >
+              {isOrdersActive ? (
+                <div className="w-9 h-9 rounded-2xl bg-[#EE4D2D] text-white flex items-center justify-center shadow-sm shadow-orange-500/30">
+                  <ShoppingBag className="w-5 h-5 stroke-[2.4]" />
+                </div>
+              ) : (
+                <div className="w-9 h-9 flex items-center justify-center text-slate-400">
+                  <ShoppingBag className="w-5 h-5 stroke-[1.8]" />
+                </div>
+              )}
+              <span className={`text-[11px] mt-0.5 ${isOrdersActive ? 'font-bold text-[#EE4D2D]' : 'font-medium text-slate-500'}`}>
+                Đơn hàng
+              </span>
+            </button>
+          );
+        })()}
+
+        {/* 4. Rút tiền */}
+        {(() => {
+          const isWithdrawActive = location.pathname === '/wallet' && location.hash.includes('withdraw') && !mobileMenuOpen;
+          return (
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                if (!currentUser) {
+                  openAuthModal('login');
+                } else {
+                  navigate('/wallet#withdraw');
+                  setTimeout(() => {
+                    const el = document.getElementById('withdraw-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }, 120);
+                }
+              }}
+              className="flex-1 flex flex-col items-center justify-center py-1 transition-all active:scale-95 cursor-pointer"
+            >
+              {isWithdrawActive ? (
+                <div className="w-9 h-9 rounded-2xl bg-[#EE4D2D] text-white flex items-center justify-center shadow-sm shadow-orange-500/30">
+                  <Banknote className="w-5 h-5 stroke-[2.4]" />
+                </div>
+              ) : (
+                <div className="w-9 h-9 flex items-center justify-center text-slate-400">
+                  <Banknote className="w-5 h-5 stroke-[1.8]" />
+                </div>
+              )}
+              <span className={`text-[11px] mt-0.5 ${isWithdrawActive ? 'font-bold text-[#EE4D2D]' : 'font-medium text-slate-500'}`}>
+                Rút tiền
+              </span>
+            </button>
+          );
+        })()}
+
+        {/* 5. Thêm */}
+        {(() => {
+          const isMoreActive = mobileMenuOpen;
+          return (
+            <button
+              onClick={() => setMobileMenuOpen(prev => !prev)}
+              className="flex-1 flex flex-col items-center justify-center py-1 transition-all active:scale-95 cursor-pointer"
+            >
+              {isMoreActive ? (
+                <div className="w-9 h-9 rounded-2xl bg-[#EE4D2D] text-white flex items-center justify-center shadow-sm shadow-orange-500/30">
+                  <Menu className="w-5 h-5 stroke-[2.4]" />
+                </div>
+              ) : (
+                <div className="w-9 h-9 flex items-center justify-center text-slate-400">
+                  <Menu className="w-5 h-5 stroke-[1.8]" />
+                </div>
+              )}
+              <span className={`text-[11px] mt-0.5 ${isMoreActive ? 'font-bold text-[#EE4D2D]' : 'font-medium text-slate-500'}`}>
+                Thêm
+              </span>
+            </button>
+          );
+        })()}
+      </nav>
     </div>
   );
 }

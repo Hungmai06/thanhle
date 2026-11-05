@@ -6,8 +6,8 @@ import {
   Search, Lock, ShoppingBag, 
   TrendingUp, Wallet, Clock, Coins, Landmark
 } from 'lucide-react';
-import { Button, Card, CardContent, Badge } from '../../components/ui/core';
-import { OrderExistenceBadge } from '../../utils/orderExistence';
+import { Button, Card, CardContent } from '../../components/ui/core';
+import { formatVietnamDateTime } from '../../utils/dateTime';
 
 const TikTokIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -117,7 +117,11 @@ export default function TrackingPage() {
   const filteredOrders = platformFilteredOrders.filter(o => {
     const matchesSearch = o.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           o.productName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' ? true : o.status === statusFilter;
+    const matchesStatus = statusFilter === 'all'
+      ? true
+      : statusFilter === 'approved'
+        ? (o.status === 'approved' || o.status === 'paid')
+        : o.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -150,7 +154,7 @@ export default function TrackingPage() {
   // 4. Tạm tính (Chờ đối soát từ sàn Shopee & TikTok - 50% hoa hồng)
   const pendingCashback = isLoggedIn 
     ? platformFilteredOrders
-      .filter(o => o.status === 'pending')
+      .filter(o => o.status === 'pending' || o.status === 'received')
       .reduce((sum, o) => sum + (o.estimatedCashback || 0), 0)
     : 0;
 
@@ -162,21 +166,42 @@ export default function TrackingPage() {
     ? platformFilteredOrders.reduce((sum, o) => sum + (o.orderAmount || 0), 0)
     : 0;
 
-  const getStatusBadge = (status: Order['status']) => {
-    switch (status) {
-      case 'pending':
-        return <Badge className="bg-amber-500 text-white border-none text-[11px] py-1 px-2.5 font-bold">Chờ đối soát</Badge>;
-      case 'approved':
-        return <Badge className="bg-emerald-500 text-white border-none text-[11px] py-1 px-2.5 font-bold">Đã duyệt</Badge>;
-      case 'paid':
-        return <Badge className="bg-blue-500 text-white border-none text-[11px] py-1 px-2.5 font-bold">Đã thanh toán</Badge>;
-      case 'rejected':
-        return <Badge className="bg-rose-500 text-white border-none text-[11px] py-1 px-2.5 font-bold">Không đối soát được</Badge>;
-      case 'returned':
-        return <Badge className="bg-orange-500 text-white border-none text-[11px] py-1 px-2.5 font-bold">Hoàn hàng</Badge>;
-      default:
-        return null;
+  const getStatusBadge = (status: Order['status'] | string, orderId?: string) => {
+    const isPendingClick = orderId && (orderId.startsWith('CLK') || orderId.startsWith('TT'));
+
+    if (status === 'approved' || status === 'paid') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs">
+          Đã duyệt
+        </span>
+      );
     }
+    if (status === 'received' || (status === 'pending' && !isPendingClick)) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-sky-50 text-sky-600 border border-sky-200 shadow-xs">
+          Đã tiếp nhận
+        </span>
+      );
+    }
+    if (status === 'returned') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-orange-50 text-orange-600 border border-orange-200 shadow-xs">
+          Đơn hoàn
+        </span>
+      );
+    }
+    if (status === 'rejected') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-50 text-rose-600 border border-rose-200 shadow-xs">
+          Đơn hủy
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-600 border border-amber-200 shadow-xs">
+        Chờ đối soát
+      </span>
+    );
   };
 
   return (
@@ -319,31 +344,31 @@ export default function TrackingPage() {
         </Card>
       </div>
 
-      {/* DÒNG BIỂU THỊ RÕ DÒNG TIỀN (CÔNG THỨC VÍ MINH BẠCH) */}
-      <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3.5 sm:p-4 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-xs">
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5 font-bold text-emerald-900">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-            <span>Quy luật dòng tiền ví:</span>
+      {/* THANH ĐIỀU HƯỚNG VÍ TIỀN NHANH */}
+      {isLoggedIn && (
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50/40 to-white border border-emerald-200/70 rounded-2xl p-3.5 sm:px-5 sm:py-3 mb-6 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+              <Wallet className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs sm:text-sm font-bold text-slate-800">
+                Số dư khả dụng: <span className="text-emerald-600 font-extrabold">{availableBalance.toLocaleString('vi-VN')}đ</span>
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Rút tiền về tài khoản ngân hàng nhanh chóng và minh bạch
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 font-semibold text-slate-700 bg-white/80 px-2.5 py-1 rounded-lg border border-emerald-100 flex-wrap">
-            <span className="text-blue-700 font-bold">Hoa hồng nhận ({totalCashbackReceived.toLocaleString('vi-VN')}đ)</span>
-            <span>−</span>
-            <span className="text-purple-700 font-bold">Đã rút ({totalWithdrawn.toLocaleString('vi-VN')}đ)</span>
-            <span>=</span>
-            <span className="text-emerald-700 font-black">Số dư ví ({availableBalance.toLocaleString('vi-VN')}đ)</span>
-          </div>
-        </div>
-        {isLoggedIn && (
           <Button 
-            size="sm" 
+            size="sm"
             onClick={() => navigate('/wallet')} 
-            className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-xs"
+            className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm px-4 py-2 rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer hover:shadow-md active:scale-95"
           >
             Vào ví rút tiền →
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* TABLE SECTION WITH AUTHENTICATION GATING */}
       <div className="bg-white rounded-card border border-border/50 shadow-soft p-5 sm:p-6 relative overflow-hidden">
@@ -397,10 +422,10 @@ export default function TrackingPage() {
             >
               <option value="all">Tất cả trạng thái</option>
               <option value="pending">Chờ đối soát</option>
+              <option value="received">Đã tiếp nhận</option>
               <option value="approved">Đã duyệt</option>
-              <option value="paid">Đã thanh toán</option>
-              <option value="rejected">Không đối soát được</option>
-              <option value="returned">Hoàn hàng</option>
+              <option value="rejected">Đơn hủy</option>
+              <option value="returned">Đơn hoàn</option>
             </select>
           </div>
         </div>
@@ -416,7 +441,6 @@ export default function TrackingPage() {
                 <th className="py-3.5 px-3 text-right">Giá trị đơn</th>
                 <th className="py-3.5 px-3 text-right">Tiền hoàn dự kiến</th>
                 <th className="py-3.5 px-3 text-right">Tiền hoàn nhận được</th>
-                <th className="py-3.5 px-3 text-center">Tồn tại</th>
                 <th className="py-3.5 px-3 text-center rounded-r-input">Trạng thái</th>
               </tr>
             </thead>
@@ -443,7 +467,7 @@ export default function TrackingPage() {
                           </span>
                         )}
                       </td>
-                      <td className="py-4 px-3 text-text-secondary font-medium whitespace-nowrap">{order.createdTime ? String(order.createdTime).substring(0, 16) : 'Vừa xong'}</td>
+                      <td className="py-4 px-3 text-text-secondary font-medium whitespace-nowrap text-xs">{formatVietnamDateTime(order.createdTime)}</td>
                       <td className="py-4 px-4 max-w-[260px]">
                         <div className="flex items-center gap-2.5">
                           {order.productImage ? (
@@ -469,6 +493,10 @@ export default function TrackingPage() {
                           <span className="text-emerald-600 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md text-xs">
                             +{Math.floor(realVal).toLocaleString('vi-VN')}đ
                           </span>
+                        ) : order.status === 'received' ? (
+                          <span className="text-sky-600 text-[11px] font-semibold bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                            Đã tiếp nhận
+                          </span>
                         ) : isPending ? (
                           <span className="text-amber-600 text-[11px] font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
                             Chờ đối soát
@@ -477,20 +505,13 @@ export default function TrackingPage() {
                           <span className="text-slate-400 text-xs">0đ</span>
                         )}
                       </td>
-                      <td className="py-4 px-3 text-center whitespace-nowrap">
-                        <OrderExistenceBadge
-                          status={order.status}
-                          createdTime={order.createdTime}
-                          id={order.id}
-                        />
-                      </td>
-                      <td className="py-4 px-3 text-center whitespace-nowrap">{getStatusBadge(order.status)}</td>
+                      <td className="py-4 px-3 text-center whitespace-nowrap">{getStatusBadge(order.status, order.id)}</td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan={8} className="text-center py-16 text-text-secondary/60 font-semibold">
+                  <td colSpan={7} className="text-center py-16 text-text-secondary/60 font-semibold">
                     Không tìm thấy đơn hàng nào phù hợp
                   </td>
                 </tr>

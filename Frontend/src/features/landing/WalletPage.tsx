@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Button, Card, CardContent, Badge } from '../../components/ui/core';
 import { toast } from 'sonner';
+import { formatVietnamDateTime } from '../../utils/dateTime';
 
 interface ReferralCreditItem {
   id: string;
@@ -126,6 +127,16 @@ export default function WalletPage() {
       }
     }
   }, [currentUser]);
+
+  // Tự động cuộn đến khu vực Tạo lệnh rút tiền khi người dùng bấm vào Rút tiền từ menu/footer
+  useEffect(() => {
+    if (window.location.hash === '#withdraw') {
+      setTimeout(() => {
+        const el = document.getElementById('withdraw-section');
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 150);
+    }
+  }, []);
 
   // Orders and withdrawals for current user
   const userOrders = isLoggedIn
@@ -437,7 +448,7 @@ export default function WalletPage() {
           )}
 
           {/* REQUEST FORM CARD */}
-          <Card className="border border-border/50 bg-white shadow-soft text-left rounded-2xl">
+          <Card id="withdraw-section" className="border border-border/50 bg-white shadow-soft text-left rounded-2xl scroll-mt-24">
             <CardContent className="p-6 md:p-8">
               <h3 className="text-lg font-black text-text mb-6">Tạo lệnh rút tiền</h3>
               
@@ -835,7 +846,7 @@ export default function WalletPage() {
                               {getCreditStatusBadge()}
                             </td>
                             <td className="py-4 px-4 text-text-secondary font-medium whitespace-nowrap">
-                              {tx.createdAt || '—'}
+                              {formatVietnamDateTime(tx.createdAt)}
                             </td>
                           </tr>
                         ))
@@ -921,7 +932,7 @@ export default function WalletPage() {
                               <p className="text-[10px] text-text-secondary/80 font-bold uppercase">{item.accountHolder}</p>
                             </td>
                             <td className="py-4 px-4">{getWithdrawalBadge(item.status)}</td>
-                            <td className="py-4 px-4 text-text-secondary font-medium">{item.requestDate}</td>
+                            <td className="py-4 px-4 text-text-secondary font-medium whitespace-nowrap">{formatVietnamDateTime(item.requestDate)}</td>
                           </tr>
                         ))
                       ) : (

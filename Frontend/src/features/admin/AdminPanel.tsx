@@ -6,7 +6,8 @@ import {
   LogOut, RefreshCw, Plus, Search,
   Filter, Check, X, Lock, Unlock, Trash2, Edit2, Download,
   Upload, BarChart3, FileSpreadsheet, HelpCircle,
-  Settings2, Activity, Eye, EyeOff, Key, ExternalLink, Menu, PlayCircle
+  Settings2, Activity, Eye, EyeOff, Key, ExternalLink, Menu, PlayCircle,
+  ChevronRight
 } from 'lucide-react';
 import {
   Button, Card, CardContent, CardHeader, CardTitle, CardDescription,
@@ -16,7 +17,25 @@ import {
 import { useAppStore } from '../../store/appStore';
 import type { Order, UserProfile } from '../../store/appStore';
 import { toast } from 'sonner';
-import { OrderExistenceBadge } from '../../utils/orderExistence';
+import { formatVietnamDateTime } from '../../utils/dateTime';
+
+const renderOrderStatusBadge = (status: string, orderId?: string) => {
+  const isPendingClick = orderId && (orderId.startsWith('CLK') || orderId.startsWith('TT'));
+
+  if (status === 'approved' || status === 'paid') {
+    return <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white border-none text-[11px] font-bold">Đã duyệt</Badge>;
+  }
+  if (status === 'received' || (status === 'pending' && !isPendingClick)) {
+    return <Badge className="bg-blue-600 hover:bg-blue-700 text-white border-none text-[11px] font-bold">Đã tiếp nhận</Badge>;
+  }
+  if (status === 'returned') {
+    return <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-none text-[11px] font-bold">Đơn hoàn</Badge>;
+  }
+  if (status === 'rejected') {
+    return <Badge className="bg-rose-500 hover:bg-rose-600 text-white border-none text-[11px] font-bold">Đơn hủy</Badge>;
+  }
+  return <Badge className="bg-amber-500 hover:bg-amber-600 text-white border-none text-[11px] font-bold">Chờ đối soát</Badge>;
+};
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip,
   BarChart, Bar, Legend, Cell
@@ -1222,8 +1241,8 @@ export default function AdminPanel() {
   return (
     <div className="min-h-screen bg-bg flex flex-col font-poppins">
 
-      {/* HEADER NAVBAR */}
-      <header className="sticky top-0 z-30 glass-panel shadow-sm w-full py-4 px-6 flex items-center justify-between border-b border-border">
+      {/* HEADER NAVBAR CỐ ĐỊNH KHI CUỘN */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md shadow-xs w-full py-3.5 px-4 sm:px-6 flex items-center justify-between border-b border-border">
         {/* LEFT: BRAND */}
         <div className="flex items-center gap-2.5 sm:gap-3">
           <div className="gradient-bg p-2 rounded-[12px] text-white shadow-xs">
@@ -1255,22 +1274,32 @@ export default function AdminPanel() {
             Thoát
           </Button>
 
-          {/* DẤU 3 GẠCH MENU - CHỈ HIỆN TRÊN ĐIỆN THOẠI (md:hidden) */}
-          <button
-            type="button"
-            onClick={() => setIsMenuOpen(prev => !prev)}
-            title="Menu Quản Trị"
-            className="flex md:hidden items-center gap-2 px-3 py-2 rounded-xl bg-primary text-white hover:bg-[#E04810] shadow-xs transition-all cursor-pointer font-bold text-xs active:scale-95"
-            aria-label="Mở menu quản trị"
-          >
-            <Menu className="h-4.5 w-4.5" />
-            <span>Menu</span>
-            {(withdrawals.filter(w => w.status === 'pending').length + pendingShopeeOrdersCount + pendingTikTokOrdersCount) > 0 && (
-              <span className="flex h-4.5 min-w-4.5 px-1 items-center justify-center rounded-full bg-white text-primary text-[10px] font-black">
-                {withdrawals.filter(w => w.status === 'pending').length + pendingShopeeOrdersCount + pendingTikTokOrdersCount}
-              </span>
-            )}
-          </button>
+          {/* NÚT MENU / ĐÓNG X MOBILE */}
+          {isMenuOpen ? (
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen(false)}
+              className="flex md:hidden w-10 h-10 rounded-2xl bg-[#E84A36] hover:bg-[#d03d2b] text-white items-center justify-center shadow-md active:scale-95 transition-all cursor-pointer"
+              aria-label="Đóng menu quản trị"
+            >
+              <X className="w-5 h-5 stroke-[2.5]" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen(true)}
+              title="Menu Quản Trị"
+              className="flex md:hidden w-10 h-10 rounded-2xl bg-[#EE4D2D] hover:bg-[#d03d2b] text-white items-center justify-center shadow-md shadow-orange-500/25 active:scale-95 transition-all cursor-pointer relative"
+              aria-label="Mở menu quản trị"
+            >
+              <Menu className="w-5 h-5 text-white stroke-[2.5]" />
+              {(withdrawals.filter(w => w.status === 'pending').length + pendingShopeeOrdersCount + pendingTikTokOrdersCount) > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4.5 min-w-4.5 px-1 items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-black border-2 border-white shadow-xs">
+                  {withdrawals.filter(w => w.status === 'pending').length + pendingShopeeOrdersCount + pendingTikTokOrdersCount}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </header>
 
@@ -1345,50 +1374,65 @@ export default function AdminPanel() {
           </div>
         </aside>
 
-        {/* 2. SLIDE-OVER DRAWER TRÊN ĐIỆN THOẠI (CHỈ HIỆN TRÊN MOBILE KHI BẤM MENU) */}
+        {/* 2. CARD POPUP TRÊN ĐIỆN THOẠI (XỔ NGAY DƯỚI HEADER - HOÀN TOÀN KHÔNG CÓ NỀN MỜ ĐEN) */}
         <AnimatePresence>
           {isMenuOpen && (
-            <div className="fixed inset-0 z-50 flex justify-start md:hidden">
-              {/* Backdrop làm mờ hậu cảnh */}
+            <div className="fixed inset-0 z-40 md:hidden pointer-events-none">
+              {/* Lớp phủ trong suốt (bg-transparent, KHÔNG mờ, KHÔNG đen, trang web phía sau sáng 100%) để click ra ngoài là đóng */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setIsMenuOpen(false)}
-                className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+                className="absolute inset-0 bg-transparent pointer-events-auto"
               />
 
-              {/* Panel menu trượt từ cạnh trái trên điện thoại */}
+              {/* Card Menu xổ ngay dưới Header (top-[68px]), bo tròn 3xl, đổ bóng đẹp, không dài tới đáy */}
               <motion.div
-                initial={{ x: '-100%' }}
-                animate={{ x: 0 }}
-                exit={{ x: '-100%' }}
-                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="relative w-full max-w-xs bg-white h-full shadow-2xl flex flex-col justify-between z-10 border-r border-border"
+                initial={{ opacity: 0, scale: 0.96, y: -10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: -10 }}
+                transition={{ duration: 0.15 }}
+                className="relative top-[68px] mx-3 max-w-sm sm:mx-auto bg-white rounded-3xl shadow-2xl border border-slate-200/90 pointer-events-auto flex flex-col overflow-hidden max-h-[calc(100vh-85px)] z-10"
               >
-                {/* Header của menu mobile */}
-                <div className="p-4 border-b border-border flex items-center justify-between bg-slate-50/60">
-                  <div className="flex items-center gap-2">
-                    <div className="gradient-bg p-1.5 rounded-lg text-white shadow-2xs">
+                {/* 1. Header Card: Logo / Tiêu đề bên trái, nút đóng [X] màu đỏ cam bên phải */}
+                <div className="p-4 border-b border-border/70 flex items-center justify-between bg-white shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#EE4D2D] to-orange-500 text-white flex items-center justify-center shadow-xs">
                       <ShieldCheck className="h-4.5 w-4.5" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-sm text-text">Menu Quản Trị</h3>
-                      <p className="text-[11px] text-text-secondary">Chọn mục để chuyển trang</p>
+                      <h3 className="font-bold text-sm text-text leading-tight">Menu Quản Trị</h3>
+                      <p className="text-[11px] text-text-secondary">Quản trị hệ thống SanHoanTien</p>
                     </div>
                   </div>
+
+                  {/* Nút đóng X màu đỏ cam bo góc */}
                   <button
                     type="button"
                     onClick={() => setIsMenuOpen(false)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-text hover:bg-slate-200/60 transition-colors cursor-pointer"
-                    title="Đóng menu"
+                    className="w-9 h-9 rounded-xl bg-[#E84A36] text-white flex items-center justify-center hover:bg-[#d03d2b] shadow-xs active:scale-95 transition-all cursor-pointer"
+                    aria-label="Đóng menu"
                   >
-                    <X className="h-5 w-5" />
+                    <X className="w-5 h-5 stroke-[2.5]" />
                   </button>
                 </div>
 
-                {/* Danh sách các mục quản trị mobile */}
-                <div className="p-3 flex-1 overflow-y-auto flex flex-col gap-1.5">
+                {/* 2. Admin Info Box */}
+                <div className="px-4 py-2.5 bg-slate-50/70 border-b border-border/50 shrink-0">
+                  <div className="flex items-center gap-3 p-2 rounded-2xl bg-white border border-border/60 shadow-2xs">
+                    <div className="w-9 h-9 rounded-xl bg-[#FFF2EB] text-[#EE4D2D] border border-[#EE4D2D]/20 flex items-center justify-center font-black text-xs shrink-0">
+                      ADMIN
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-text truncate">{currentUser.name || 'Quản trị viên'}</p>
+                      <p className="text-[10px] text-text-secondary truncate">{currentUser.email || 'admin@sanhoantien.com'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Danh sách các mục quản trị (Cuộn nếu danh sách dài) */}
+                <div className="p-3 overflow-y-auto flex flex-col gap-1.5 flex-1 overscroll-contain">
                   {[
                     { id: 'dashboard', icon: <BarChart3 className="h-4.5 w-4.5 shrink-0" />, label: 'Báo cáo thống kê' },
                     { id: 'users', icon: <Users className="h-4.5 w-4.5 shrink-0" />, label: 'Quản lý tài khoản' },
@@ -1411,22 +1455,22 @@ export default function AdminPanel() {
                           setActiveTab(tab.id as any);
                           setIsMenuOpen(false);
                         }}
-                        className={`w-full flex items-center justify-between px-3.5 py-3 text-xs font-semibold rounded-xl transition-all duration-200 text-left cursor-pointer ${
+                        className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold rounded-xl transition-all duration-200 text-left cursor-pointer ${
                           isActive
-                            ? 'bg-[#FFF2EB] text-primary shadow-xs border border-primary/25 font-bold'
-                            : 'text-slate-700 bg-white hover:bg-[#FFF2EB] hover:text-primary hover:shadow-xs border border-transparent'
+                            ? 'bg-[#FFF2EB] text-[#EE4D2D] shadow-xs border border-[#EE4D2D]/30 font-bold'
+                            : 'text-slate-700 bg-white hover:bg-slate-50 border border-transparent'
                         }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className={`p-1 rounded-lg transition-colors duration-200 ${isActive ? 'text-primary' : 'text-slate-500'}`}>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`p-1 rounded-lg transition-colors duration-200 ${isActive ? 'text-[#EE4D2D]' : 'text-slate-500'}`}>
                             {tab.icon}
                           </div>
-                          <span className={`text-sm tracking-tight ${isActive ? 'font-bold text-primary' : 'font-medium text-slate-700'}`}>
+                          <span className={`text-[13px] tracking-tight truncate ${isActive ? 'font-bold text-[#EE4D2D]' : 'font-medium text-slate-700'}`}>
                             {tab.label}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2 shrink-0">
                           {pendingWithdrawCount > 0 && (
                             <Badge variant="danger" className="py-0.5 px-2 text-[10px]">{pendingWithdrawCount}</Badge>
                           )}
@@ -1436,27 +1480,34 @@ export default function AdminPanel() {
                           {pendingTikTokCount > 0 && (
                             <Badge variant="warning" className="py-0.5 px-2 text-[10px] bg-slate-900 text-white border-none">{pendingTikTokCount}</Badge>
                           )}
+                          <ChevronRight className={`w-4 h-4 shrink-0 transition-colors ${isActive ? 'text-[#EE4D2D]' : 'text-slate-300'}`} />
                         </div>
                       </button>
                     );
                   })}
                 </div>
 
-                {/* Chân trang Menu mobile */}
-                <div className="p-4 border-t border-border bg-slate-50/80 flex flex-col gap-2">
+                {/* 4. Chân Card: Nút Chuyển trang & Đăng xuất */}
+                <div className="p-3 border-t border-border/70 bg-slate-50/70 flex flex-col gap-2 shrink-0">
                   <button
                     onClick={() => { navigate('/'); setIsMenuOpen(false); }}
-                    className="flex w-full items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold text-slate-700 bg-white border border-border rounded-xl hover:bg-slate-100 transition-colors shadow-2xs cursor-pointer"
+                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-xs font-bold text-slate-700 bg-white border border-border rounded-xl hover:bg-slate-100 transition-colors shadow-2xs cursor-pointer"
                   >
-                    <ShoppingBag className="h-4 w-4" />
-                    Xem Trang Landing
+                    <div className="flex items-center gap-2.5">
+                      <ShoppingBag className="h-4 w-4 text-slate-500" />
+                      <span>Xem Trang Landing</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-300" />
                   </button>
                   <button
                     onClick={() => { logout(); toast.info('Đã đăng xuất'); navigate('/'); }}
-                    className="flex w-full items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold text-danger bg-red-50/50 border border-red-200 rounded-xl hover:bg-red-100/60 transition-colors cursor-pointer"
+                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-xs font-bold text-danger bg-red-50/60 border border-red-200/80 rounded-xl hover:bg-red-100/60 transition-colors cursor-pointer"
                   >
-                    <LogOut className="h-4 w-4" />
-                    Đăng Xuất
+                    <div className="flex items-center gap-2.5">
+                      <LogOut className="h-4 w-4" />
+                      <span>Đăng Xuất</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-red-300" />
                   </button>
                 </div>
               </motion.div>
@@ -2240,14 +2291,12 @@ export default function AdminPanel() {
                   <TableContainer>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Mã Đơn</TableHead>
                         <TableHead>Thành Viên</TableHead>
                         <TableHead>Sản Phẩm</TableHead>
                         <TableHead className="text-right">Giá Trị Đơn</TableHead>
                         <TableHead className="text-right">Hoa Hồng Shopee (100%)</TableHead>
                         <TableHead className="text-right">Hoàn Tiền Khách</TableHead>
                         <TableHead>Ngày Đặt</TableHead>
-                        <TableHead className="text-center">Tồn tại</TableHead>
                         <TableHead>Trạng Thái</TableHead>
                         <TableHead className="text-center">Thao Tác</TableHead>
                       </TableRow>
@@ -2255,14 +2304,14 @@ export default function AdminPanel() {
                     <TableBody>
                       {isLoadingOrders ? (
                         <TableRow>
-                          <TableCell colSpan={10} className="text-center py-16 text-xs text-text-secondary font-medium">
+                          <TableCell colSpan={8} className="text-center py-16 text-xs text-text-secondary font-medium">
                             <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-primary" />
                             Đang tải danh sách đơn hàng...
                           </TableCell>
                         </TableRow>
                       ) : paginatedOrders.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={10} className="text-center py-16 text-xs text-text-secondary font-medium">
+                          <TableCell colSpan={8} className="text-center py-16 text-xs text-text-secondary font-medium">
                             Chưa có đơn hàng nào phát sinh hoặc không tìm thấy đơn hàng phù hợp với từ khóa tìm kiếm.
                           </TableCell>
                         </TableRow>
@@ -2272,7 +2321,6 @@ export default function AdminPanel() {
                           const shopeeComm = Math.floor(o.shopeeCommission !== undefined && o.shopeeCommission !== null ? o.shopeeCommission : userCashback * 2);
                           return (
                             <TableRow key={o.id}>
-                              <TableCell className="font-bold text-primary">{o.id}</TableCell>
                               <TableCell className="font-semibold text-xs text-text-secondary">
                                 {o.userId ? (
                                   <div className="flex flex-col">
@@ -2289,22 +2337,11 @@ export default function AdminPanel() {
                               <TableCell className="text-right font-semibold">{Math.floor(o.orderAmount).toLocaleString('vi-VN')}đ</TableCell>
                               <TableCell className="text-right font-semibold text-text-secondary">{Math.floor(shopeeComm).toLocaleString('vi-VN')}đ</TableCell>
                               <TableCell className="text-right font-bold text-primary">{Math.floor(userCashback).toLocaleString('vi-VN')}đ</TableCell>
-                              <TableCell className="text-xs font-semibold text-text-secondary">
-                                {o.createdTime ? o.createdTime.substring(0, 16) : '-'}
-                              </TableCell>
-                              <TableCell className="text-center whitespace-nowrap">
-                                <OrderExistenceBadge
-                                  status={o.status}
-                                  createdTime={o.createdTime}
-                                  id={o.id}
-                                />
+                              <TableCell className="text-xs font-semibold text-text-secondary whitespace-nowrap">
+                                {formatVietnamDateTime(o.createdTime)}
                               </TableCell>
                               <TableCell>
-                                {o.status === 'pending' && <Badge variant="info">Đang chờ xử lý</Badge>}
-                                {o.status === 'approved' && <Badge variant="success">Hoàn thành</Badge>}
-                                {o.status === 'rejected' && <Badge variant="danger">Hủy</Badge>}
-                                {o.status === 'returned' && <Badge variant="warning" className="bg-orange-50 text-orange-600 border-orange-200">Hoàn hàng</Badge>}
-                                {o.status === 'paid' && <Badge variant="warning">Đã thanh toán</Badge>}
+                                {renderOrderStatusBadge(o.status, o.id)}
                               </TableCell>
                               <TableCell className="text-center">
                                 <div className="flex items-center justify-center gap-1.5">
@@ -2523,14 +2560,12 @@ export default function AdminPanel() {
                   <TableContainer>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Mã Đơn TikTok</TableHead>
                         <TableHead>Thành Viên</TableHead>
                         <TableHead>Sản Phẩm</TableHead>
                         <TableHead className="text-right">Giá Trị Đơn</TableHead>
                         <TableHead className="text-right">Hoa Hồng Sàn (100%)</TableHead>
                         <TableHead className="text-right">Hoàn Tiền Khách</TableHead>
                         <TableHead>Ngày Đặt</TableHead>
-                        <TableHead className="text-center">Tồn tại</TableHead>
                         <TableHead>Trạng Thái</TableHead>
                         <TableHead className="text-center">Thao Tác</TableHead>
                       </TableRow>
@@ -2538,14 +2573,14 @@ export default function AdminPanel() {
                     <TableBody>
                       {isLoadingTikTokOrders ? (
                         <TableRow>
-                          <TableCell colSpan={10} className="text-center py-16 text-xs text-text-secondary font-medium">
+                          <TableCell colSpan={8} className="text-center py-16 text-xs text-text-secondary font-medium">
                             <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-primary" />
                             Đang tải danh sách đơn hàng TikTok...
                           </TableCell>
                         </TableRow>
                       ) : (tiktokOrders || []).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={10} className="text-center py-16 text-xs text-text-secondary font-medium">
+                          <TableCell colSpan={8} className="text-center py-16 text-xs text-text-secondary font-medium">
                             Chưa có đơn hàng TikTok nào hoặc không tìm thấy đơn phù hợp. Nhấn "Đồng bộ nhanh" để tải đơn về!
                           </TableCell>
                         </TableRow>
@@ -2557,14 +2592,6 @@ export default function AdminPanel() {
 
                           return (
                             <TableRow key={order.id} className="hover:bg-bg/40">
-                              <TableCell className="font-bold text-slate-900 dark:text-white">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="p-1 bg-slate-900 text-white rounded-md shrink-0">
-                                    <TikTokIcon className="h-3 w-3" />
-                                  </span>
-                                  <span className="font-mono text-xs">{order.id}</span>
-                                </div>
-                              </TableCell>
                               <TableCell>
                                 {order.userId ? (
                                   <div>
@@ -2602,21 +2629,10 @@ export default function AdminPanel() {
                                 {order.realCashback ? `${Math.floor(order.realCashback).toLocaleString('vi-VN')}đ` : `${Math.floor(order.estimatedCashback).toLocaleString('vi-VN')}đ (DK)`}
                               </TableCell>
                               <TableCell className="text-xs text-text-secondary font-medium whitespace-nowrap">
-                                {order.createdTime ? String(order.createdTime).substring(0, 16) : '-'}
-                              </TableCell>
-                              <TableCell className="text-center whitespace-nowrap">
-                                <OrderExistenceBadge
-                                  status={order.status}
-                                  createdTime={order.createdTime}
-                                  id={order.id}
-                                />
+                                {formatVietnamDateTime(order.createdTime)}
                               </TableCell>
                               <TableCell>
-                                {order.status === 'approved' && <Badge variant="success">Hoàn thành</Badge>}
-                                {order.status === 'pending' && <Badge variant="info">Chờ xử lý</Badge>}
-                                {order.status === 'rejected' && <Badge variant="danger">Hủy</Badge>}
-                                {order.status === 'returned' && <Badge variant="warning" className="bg-orange-50 text-orange-600 border-orange-200">Hoàn hàng</Badge>}
-                                {order.status === 'paid' && <Badge variant="warning">Đã thanh toán</Badge>}
+                                {renderOrderStatusBadge(order.status, order.id)}
                               </TableCell>
                               <TableCell className="text-center">
                                 <div className="flex items-center justify-center gap-1">
@@ -2895,7 +2911,7 @@ export default function AdminPanel() {
                             <TableCell className="font-semibold text-xs">{w.bankName}</TableCell>
                             <TableCell className="font-mono text-xs">{w.accountNumber}</TableCell>
                             <TableCell className="font-semibold text-xs">{w.accountHolder}</TableCell>
-                            <TableCell className="text-xs text-text-secondary font-medium">{w.requestDate}</TableCell>
+                            <TableCell className="text-xs text-text-secondary font-medium whitespace-nowrap">{formatVietnamDateTime(w.requestDate)}</TableCell>
                             <TableCell>
                               {w.status === 'pending' && <Badge variant="info">Chờ duyệt</Badge>}
                               {w.status === 'approved' && <Badge variant="success">Thành công</Badge>}
@@ -3083,7 +3099,7 @@ export default function AdminPanel() {
                           <p className="text-xs font-bold text-text truncate max-w-[180px]">{item.fileName}</p>
                           <Badge variant="outline" className="text-[9px] py-0 px-2 font-bold uppercase">{item.id}</Badge>
                         </div>
-                        <p className="text-[10px] text-text-secondary font-medium">Thời gian nạp: {item.uploadTime}</p>
+                        <p className="text-[10px] text-text-secondary font-medium">Thời gian nạp: {formatVietnamDateTime(item.uploadTime)}</p>
 
                         <div className="grid grid-cols-2 gap-2 text-[10px] text-text-secondary pt-2 border-t border-border/40 font-semibold mt-1">
                           <div>
@@ -3644,7 +3660,7 @@ export default function AdminPanel() {
               <p><span className="text-text-secondary">Giá trị đơn:</span> <span className="text-text font-bold">{editingOrder?.orderAmount.toLocaleString('vi-VN')}đ</span></p>
               <p><span className="text-text-secondary">Hoa hồng Shopee ước tính:</span> <span className="text-text font-bold">{editingOrder?.estimatedCashback.toLocaleString('vi-VN')}đ</span></p>
               {editingOrder?.createdTime && (
-                <p><span className="text-text-secondary">Thời gian đặt hàng:</span> <span className="text-text font-bold">{editingOrder.createdTime}</span></p>
+                <p><span className="text-text-secondary">Thời gian đặt hàng:</span> <span className="text-text font-bold">{formatVietnamDateTime(editingOrder.createdTime)}</span></p>
               )}
             </div>
 
@@ -3987,7 +4003,6 @@ export default function AdminPanel() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Sàn</TableHead>
-                  <TableHead>Mã Đơn</TableHead>
                   <TableHead>Sản Phẩm</TableHead>
                   <TableHead className="text-right">Giá Trị</TableHead>
                   <TableHead className="text-right">Hoàn Tiền Khách</TableHead>
@@ -3998,14 +4013,14 @@ export default function AdminPanel() {
               <TableBody>
                 {isLoadingUserOrders ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12 text-xs text-text-secondary">
+                    <TableCell colSpan={6} className="text-center py-12 text-xs text-text-secondary">
                       <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-primary" />
                       Đang tải danh sách đơn hàng của thành viên...
                     </TableCell>
                   </TableRow>
                 ) : userOrdersList.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12 text-xs text-text-secondary font-medium">
+                    <TableCell colSpan={6} className="text-center py-12 text-xs text-text-secondary font-medium">
                       Thành viên này chưa có đơn hàng nào phát sinh trên hệ thống.
                     </TableCell>
                   </TableRow>
@@ -4023,7 +4038,6 @@ export default function AdminPanel() {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="font-bold text-primary text-xs font-mono">{o.id}</TableCell>
                       <TableCell className="max-w-[200px] truncate font-semibold text-xs">
                         <span title={o.productName}>{o.productName}</span>
                       </TableCell>
@@ -4034,14 +4048,10 @@ export default function AdminPanel() {
                         {Math.round(o.realCashback || o.estimatedCashback || 0).toLocaleString('vi-VN')}đ
                       </TableCell>
                       <TableCell className="text-xs font-semibold text-text-secondary whitespace-nowrap">
-                        {o.createdTime ? o.createdTime.substring(0, 16) : '-'}
+                        {formatVietnamDateTime(o.createdTime)}
                       </TableCell>
                       <TableCell>
-                        {o.status === 'pending' && <Badge variant="info">Đang chờ xử lý</Badge>}
-                        {o.status === 'approved' && <Badge variant="success">Hoàn thành</Badge>}
-                        {o.status === 'rejected' && <Badge variant="danger">Hủy</Badge>}
-                        {o.status === 'returned' && <Badge variant="warning" className="bg-orange-50 text-orange-600 border-orange-200">Hoàn hàng</Badge>}
-                        {o.status === 'paid' && <Badge variant="warning">Đã thanh toán</Badge>}
+                        {renderOrderStatusBadge(o.status, o.id)}
                       </TableCell>
                     </TableRow>
                   ))

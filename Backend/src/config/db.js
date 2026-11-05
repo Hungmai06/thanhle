@@ -66,12 +66,19 @@ async function initializeDatabase() {
       user,
       password,
       database: dbName,
+      timezone: '+07:00',
       waitForConnections: true,
       connectionLimit: 100,
       queueLimit: 0,
       enableKeepAlive: true,
       keepAliveInitialDelay: 0
     });
+
+    try {
+      await pool.query("SET time_zone = '+07:00'");
+    } catch (tzErr) {
+      console.warn('Could not set mysql time_zone to +07:00:', tzErr.message);
+    }
 
     const wrapper = new MySQLWrapper(pool);
 
@@ -401,8 +408,8 @@ async function initializeDatabase() {
         signup_bonus REAL DEFAULT 30000,
         refresh_token TEXT,
         affiliate_sub_id TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT (datetime('now', '+7 hours')),
+        updated_at DATETIME DEFAULT (datetime('now', '+7 hours'))
       )
     `);
 
@@ -431,7 +438,7 @@ async function initializeDatabase() {
         user_id TEXT NULL,
         product_url TEXT NOT NULL,
         sub_id TEXT NULL,
-        click_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+        click_time DATETIME DEFAULT (datetime('now', '+7 hours')),
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
@@ -460,8 +467,8 @@ async function initializeDatabase() {
         status TEXT CHECK(status IN ('pending', 'approved', 'rejected', 'paid', 'returned')) DEFAULT 'pending',
         screenshot TEXT,
         notes TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT (datetime('now', '+7 hours')),
+        updated_at DATETIME DEFAULT (datetime('now', '+7 hours'))
       )
     `);
 
@@ -493,8 +500,8 @@ async function initializeDatabase() {
         sub_id TEXT,
         screenshot TEXT,
         notes TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT (datetime('now', '+7 hours')),
+        updated_at DATETIME DEFAULT (datetime('now', '+7 hours')),
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
       )
     `);
@@ -520,7 +527,7 @@ async function initializeDatabase() {
         account_number TEXT NOT NULL,
         account_holder TEXT NOT NULL,
         status TEXT CHECK(status IN ('pending', 'approved', 'rejected')) DEFAULT 'pending',
-        request_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        request_date DATETIME DEFAULT (datetime('now', '+7 hours')),
         processed_date DATETIME,
         notes TEXT,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -550,7 +557,7 @@ async function initializeDatabase() {
         telegram_notification INTEGER DEFAULT 1,
         email_notification INTEGER DEFAULT 1,
         maintenance_mode INTEGER DEFAULT 0,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        updated_at DATETIME DEFAULT (datetime('now', '+7 hours'))
       )
     `);
 
@@ -578,7 +585,7 @@ async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS reconciliation_logs (
         id TEXT PRIMARY KEY,
         file_name TEXT NOT NULL,
-        upload_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+        upload_time DATETIME DEFAULT (datetime('now', '+7 hours')),
         total_rows INTEGER NOT NULL,
         matched_count INTEGER DEFAULT 0,
         duplicate_count INTEGER DEFAULT 0,
@@ -595,7 +602,7 @@ async function initializeDatabase() {
         content TEXT NOT NULL,
         type TEXT CHECK(type IN ('order', 'wallet', 'system')) NOT NULL,
         \`read\` INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT (datetime('now', '+7 hours')),
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
@@ -604,9 +611,9 @@ async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS devices (
         id TEXT PRIMARY KEY,
         device_fingerprint_hash TEXT UNIQUE NOT NULL,
-        first_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        first_seen_at DATETIME DEFAULT (datetime('now', '+7 hours')),
+        last_seen_at DATETIME DEFAULT (datetime('now', '+7 hours')),
+        created_at DATETIME DEFAULT (datetime('now', '+7 hours'))
       )
     `);
 
@@ -616,7 +623,7 @@ async function initializeDatabase() {
         user_id TEXT UNIQUE NOT NULL,
         device_id TEXT NOT NULL,
         registration_ip_hash TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT (datetime('now', '+7 hours'))
       )
     `);
 

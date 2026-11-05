@@ -485,18 +485,21 @@ async function handleTikTokWebhook(req, res) {
     const actualCommission = Number(orderData.actual_commission || orderData.settled_commission || estCommission);
 
     // Chuẩn hóa trạng thái đơn theo quy chuẩn hệ thống:
-    // 1 / pending -> 'pending'
-    // 2 / settled / settled_status -> 'approved'
-    // 3 / cancelled / refunded -> 'rejected'
-    let orderStatus = 'pending';
+    // 1 / pending / created -> 'received' (Đã tiếp nhận từ sàn)
+    // 2 / settled / completed -> 'approved' (Đã duyệt)
+    // 3 / cancelled -> 'rejected' (Đơn hủy)
+    // refunded / returned -> 'returned' (Đơn hoàn)
+    let orderStatus = 'received';
     const rawStatus = String(orderData.status || orderData.settlement_status || '').toLowerCase();
 
     if (rawStatus === '2' || rawStatus === 'settled' || rawStatus === 'completed' || event === 'order.settled') {
       orderStatus = 'approved';
-    } else if (rawStatus === '3' || rawStatus === 'cancelled' || rawStatus === 'refunded' || event === 'order.refunded') {
+    } else if (rawStatus === '3' || rawStatus === 'cancelled' || event === 'order.cancelled') {
       orderStatus = 'rejected';
+    } else if (rawStatus === 'refunded' || event === 'order.refunded') {
+      orderStatus = 'returned';
     } else {
-      orderStatus = 'pending';
+      orderStatus = 'received';
     }
 
     // Hoàn 50% giá trị sau đối soát kể cả hoa hồng dự kiến cũng báo 50%
@@ -514,19 +517,19 @@ async function handleTikTokWebhook(req, res) {
     if (!existingOrder) {
       if (targetClickId) {
         pendingOrder = await db.get(
-          "SELECT id, user_id FROM tiktok_orders WHERE (click_id = ? OR id = ?) AND status = 'pending'",
+          "SELECT id, user_id FROM tiktok_orders WHERE (click_id = ? OR id = ?) AND status IN ('pending', 'received')",
           [targetClickId, targetClickId]
         );
       }
       if (!pendingOrder && subId) {
         pendingOrder = await db.get(
-          "SELECT id, user_id FROM tiktok_orders WHERE sub_id = ? AND status = 'pending'",
+          "SELECT id, user_id FROM tiktok_orders WHERE sub_id = ? AND status IN ('pending', 'received')",
           [subId]
         );
       }
       if (!pendingOrder && targetUserId) {
         pendingOrder = await db.get(
-          "SELECT id, user_id FROM tiktok_orders WHERE user_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1",
+          "SELECT id, user_id FROM tiktok_orders WHERE user_id = ? AND status IN ('pending', 'received') ORDER BY created_at DESC LIMIT 1",
           [targetUserId]
         );
       }
@@ -864,20 +867,19 @@ async function processTikTokOrders(db, orderList = []) {
     const estCommission = Number(item.est_commission || item.commission_amount || item.commission || 0);
     const actualCommission = Number(item.actual_commission || estCommission);
 
-    let orderStatus = 'pending';
+    let orderStatus = 'received';
     const rawStat = String(item.status || '').trim();
     const settlementStat = String(item.settlement_status || '').toUpperCase().trim();
 
     if (rawStat === '2' || settlementStat === 'SETTLED' || rawStat === 'settled' || rawStat === 'completed') {
       orderStatus = 'approved';
       settledCount++;
-    } else if (
-      rawStat === '3' ||
-      item.fully_refunded === 1 ||
-      settlementStat.includes('REFUND') ||
-      settlementStat.includes('CANCEL')
-    ) {
+    } else if (item.fully_refunded === 1 || settlementStat.includes('REFUND')) {
+      orderStatus = 'returned';
+    } else if (rawStat === '3' || settlementStat.includes('CANCEL') || rawStat === 'cancelled') {
       orderStatus = 'rejected';
+    } else {
+      orderStatus = 'received';
     }
 
     // Hoàn 50% giá trị sau đối soát kể cả hoa hồng dự kiến cũng báo 50%
@@ -908,19 +910,19 @@ async function processTikTokOrders(db, orderList = []) {
     if (!existing) {
       if (clickId) {
         pendingToUpdate = await db.get(
-          "SELECT id, user_id FROM tiktok_orders WHERE (click_id = ? OR id = ?) AND status = 'pending'",
+          "SELECT id, user_id FROM tiktok_orders WHERE (click_id = ? OR id = ?) AND status IN ('pending', 'received')",
           [clickId, clickId]
         );
       }
       if (!pendingToUpdate && subId) {
         pendingToUpdate = await db.get(
-          "SELECT id, user_id FROM tiktok_orders WHERE sub_id = ? AND status = 'pending'",
+          "SELECT id, user_id FROM tiktok_orders WHERE sub_id = ? AND status IN ('pending', 'received')",
           [subId]
         );
       }
       if (!pendingToUpdate && userId) {
         pendingToUpdate = await db.get(
-          "SELECT id, user_id FROM tiktok_orders WHERE user_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1",
+          "SELECT id, user_id FROM tiktok_orders WHERE user_id = ? AND status IN ('pending', 'received') ORDER BY created_at DESC LIMIT 1",
           [userId]
         );
       }
