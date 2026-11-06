@@ -90,7 +90,7 @@ export default function ReferralPage() {
                   <Percent className="h-5 w-5" />
                 </div>
                 <div className="text-sm font-medium text-slate-700">
-                  <strong className="text-rose-600 font-black">+20% tiền hoàn của bạn bè:</strong> Tính trên tiền hoàn thực nhận của F1 <em>(VD: Bạn bè được hoàn 5k → Bạn nhận 1k)</em>.
+                  <strong className="text-rose-600 font-black">+20% tiền hoàn của bạn bè:</strong> Tính trên tiền hoàn thực nhận của F1 <em>(VD: F1 hoàn 100k → Bạn nhận 20k)</em>.
                 </div>
               </div>
             </div>
@@ -137,9 +137,10 @@ export default function ReferralPage() {
                 <Percent className="h-6 w-6" />
               </div>
               <div>
-                <div className="text-[11px] font-bold text-slate-400 uppercase">Thưởng theo đơn F1</div>
+                <div className="text-[11px] font-bold text-slate-400 uppercase">Hoa hồng giới thiệu</div>
                 <div className="text-2xl font-black text-rose-600">+20%</div>
-                <div className="text-[11px] font-semibold text-rose-700">Tính trên tiền hoàn của F1 (F1 hoàn 5k → Bạn +1k)</div>
+                <div className="text-[11px] font-semibold text-rose-700">Tính trên tiền hoàn của F1</div>
+                <div className="text-[10.5px] font-medium text-rose-600/90">(F1 hoàn 100k → Bạn nhận 20k)</div>
               </div>
             </div>
           </div>

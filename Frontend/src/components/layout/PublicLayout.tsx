@@ -4,7 +4,7 @@ import { useAppStore } from '../../store/appStore';
 import {
   ShoppingBag, Menu, X, Wallet, Search, HelpCircle,
   Users, LogOut, ShieldCheck, Sparkles, Phone, MessageSquare, Home,
-  ChevronRight, Banknote, Bell
+  ChevronRight, Bell
 } from 'lucide-react';
 import { Button } from '../ui/core';
 import { toast } from 'sonner';
@@ -808,36 +808,28 @@ export default function PublicLayout() {
           );
         })()}
 
-        {/* 4. Rút tiền */}
+        {/* 4. Giới thiệu */}
         {(() => {
-          const isWithdrawActive = location.pathname === '/wallet' && location.hash.includes('withdraw') && !mobileMenuOpen;
+          const isReferralActive = location.pathname === '/referral' && !mobileMenuOpen;
           return (
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
-                if (!currentUser) {
-                  openAuthModal('login');
-                } else {
-                  navigate('/wallet#withdraw');
-                  setTimeout(() => {
-                    const el = document.getElementById('withdraw-section');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }, 120);
-                }
+                navigate('/referral');
               }}
               className="flex-1 flex flex-col items-center justify-center py-1 transition-all active:scale-95 cursor-pointer"
             >
-              {isWithdrawActive ? (
+              {isReferralActive ? (
                 <div className="w-9 h-9 rounded-2xl bg-[#EE4D2D] text-white flex items-center justify-center shadow-sm shadow-orange-500/30">
-                  <Banknote className="w-5 h-5 stroke-[2.4]" />
+                  <Users className="w-5 h-5 stroke-[2.4]" />
                 </div>
               ) : (
                 <div className="w-9 h-9 flex items-center justify-center text-slate-400">
-                  <Banknote className="w-5 h-5 stroke-[1.8]" />
+                  <Users className="w-5 h-5 stroke-[1.8]" />
                 </div>
               )}
-              <span className={`text-[11px] mt-0.5 ${isWithdrawActive ? 'font-bold text-[#EE4D2D]' : 'font-medium text-slate-500'}`}>
-                Rút tiền
+              <span className={`text-[11px] mt-0.5 ${isReferralActive ? 'font-bold text-[#EE4D2D]' : 'font-medium text-slate-500'}`}>
+                Giới thiệu
               </span>
             </button>
           );

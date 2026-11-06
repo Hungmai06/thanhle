@@ -575,8 +575,18 @@ export default function UserDashboard() {
                               </TableCell>
                               <TableCell className="text-right font-semibold">{Math.floor(order.orderAmount).toLocaleString('vi-VN')}đ</TableCell>
                               <TableCell className="text-right font-bold text-primary">{Math.floor(order.estimatedCashback).toLocaleString('vi-VN')}đ</TableCell>
-                              <TableCell className="text-right font-bold text-success">
-                                {order.realCashback ? `${Math.floor(order.realCashback).toLocaleString('vi-VN')}đ` : '-'}
+                              <TableCell className="text-right font-bold whitespace-nowrap">
+                                {(order.status === 'approved' || order.status === 'paid' || (order.realCashback && Number(order.realCashback) > 0 && order.status !== 'rejected' && order.status !== 'returned')) ? (
+                                  <span className="text-emerald-600 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md text-xs">
+                                    +{Math.floor(Number(order.realCashback || order.estimatedCashback || 0)).toLocaleString('vi-VN')}đ
+                                  </span>
+                                ) : (order.status === 'rejected' || order.status === 'returned') ? (
+                                  <span className="text-slate-400 text-xs">0đ</span>
+                                ) : (
+                                  <span className="text-amber-600 text-[11px] font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                    Chờ đối soát
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell>{getStatusBadge(order.status, order.id)}</TableCell>
                               <TableCell className="text-xs text-text-secondary font-medium whitespace-nowrap">{formatVietnamDateTime(order.createdTime)}</TableCell>
@@ -1121,7 +1131,7 @@ export default function UserDashboard() {
                   <div className="space-y-1.5 text-xs">
                     <div className="font-bold text-text">🎁 Người mới đăng ký: <span className="text-emerald-600 font-black">+30.000đ</span></div>
                     <div className="font-bold text-text">👥 Mời 1 bạn bè: <span className="text-orange-600 font-black">+5.000đ</span> <span className="text-amber-700 font-medium">(Duyệt khi xong đơn đầu)</span></div>
-                    <div className="font-bold text-text">🔥 Thưởng theo đơn: <span className="text-rose-600 font-black">+20% tiền hoàn của F1</span> <span className="text-text-secondary font-medium">(VD: F1 hoàn 5k → Bạn +1k)</span></div>
+                    <div className="font-bold text-text">🔥 Thưởng theo đơn: <span className="text-rose-600 font-black">+20% tiền hoàn của F1</span> <span className="text-text-secondary font-medium">(VD: F1 hoàn 100k → Bạn nhận 20k)</span></div>
                   </div>
                   <div className="shrink-0 hidden sm:block">
                     <img src="https://cdn-icons-png.flaticon.com/512/879/879757.png" className="w-20 opacity-90 drop-shadow-sm" alt="commission" />

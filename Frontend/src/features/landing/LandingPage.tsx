@@ -475,12 +475,24 @@ export default function LandingPage() {
         createdTime: new Date().toISOString().replace('T', ' ').slice(0, 19),
         userId: currentUser.id,
         productUrl: checkedTikTokProduct.originUrl || tiktokLink,
+        shopId: checkedTikTokProduct.shopName || 'TikTok Shop',
+        itemId: checkedTikTokProduct.productId || '',
+        subId: checkedTikTokProduct.subId,
         platform: 'tiktok'
       };
       addOrder(newOrder);
     } catch {}
 
-    window.open(checkedTikTokProduct.affiliateLink, '_blank', 'noopener,noreferrer');
+    const targetUrl = checkedTikTokProduct.affiliateLink;
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|FBAN|FBAV|Instagram|Zalo/i.test(navigator.userAgent) || window.innerWidth < 768;
+    if (isMobileDevice) {
+      window.location.href = targetUrl;
+    } else {
+      const win = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      if (!win || win.closed || typeof win.closed === 'undefined') {
+        window.location.href = targetUrl;
+      }
+    }
   };
 
   const handleCreateAffiliateLink = async () => {
@@ -1319,7 +1331,7 @@ export default function LandingPage() {
                 </div>
                 <div className="flex items-center gap-2.5">
                   <CheckCircle2 className="h-4.5 w-4.5 text-rose-500 shrink-0" />
-                  <span><strong className="text-rose-600 font-black">Cộng +20% tiền hoàn của bạn bè</strong> mỗi đơn <em>(VD: Bạn bè hoàn 5k → Bạn +1k)</em>.</span>
+                  <span><strong className="text-rose-600 font-black">Cộng +20% tiền hoàn của bạn bè</strong> mỗi đơn <em>(VD: F1 hoàn 100k → Bạn nhận 20k)</em>.</span>
                 </div>
               </div>
 
@@ -1374,7 +1386,7 @@ export default function LandingPage() {
                   <Sparkles className="h-6 w-6" />
                 </div>
                 <div className="text-left">
-                  <div className="text-[11px] font-bold text-slate-400 uppercase">Hoa hồng mỗi đơn</div>
+                  <div className="text-[11px] font-bold text-slate-400 uppercase">Hoa hồng giới thiệu</div>
                   <h3 className="text-2xl font-black text-rose-600">+20%</h3>
                 </div>
               </div>
@@ -1479,8 +1491,8 @@ export default function LandingPage() {
             <AccordionItem title="Số dư tối thiểu để rút tiền là bao nhiêu?">
               Hạn mức rút tiền tối thiểu của ví hoàn tiền là 50.000đ. Người mới đăng ký được tặng ngay 30.000đ vào ví, chỉ cần mua sắm hoàn tiền hoặc giới thiệu bạn bè tích lũy thêm 20.000đ để đạt đủ 50.000đ là có thể rút thẳng về ngân hàng.
             </AccordionItem>
-            <AccordionItem title="Chương trình giới thiệu bạn bè (+5.000đ/người) hoạt động thế nào?">
-              Khi bạn chia sẻ link hoặc mã giới thiệu cho bạn bè: người mới đăng ký nhận ngay 30.000đ vào ví, còn bạn nhận ngay +5.000đ vào mục Chờ duyệt. Ngay khi người được giới thiệu (cấp dưới) hoàn thành đơn hàng đầu tiên, +5.000đ sẽ được duyệt và cộng thẳng vào Số dư khả dụng của bạn.
+            <AccordionItem title="Chương trình giới thiệu bạn bè (+5.000đ/người & +20% hoa hồng) hoạt động thế nào?">
+              Khi bạn chia sẻ link hoặc mã giới thiệu cho bạn bè: người mới đăng ký nhận ngay 30.000đ vào ví, còn bạn nhận ngay +5.000đ vào mục Chờ duyệt. Ngay khi người được giới thiệu (cấp dưới) hoàn thành đơn hàng đầu tiên, +5.000đ sẽ được duyệt và cộng thẳng vào Số dư khả dụng của bạn. Ngoài ra, bạn còn nhận thêm 20% hoa hồng khi cấp dưới hoàn thành đơn hàng. Ví dụ khi cấp dưới được hoàn 100k bạn sẽ được nhận hoa hồng 20k.
             </AccordionItem>
             <AccordionItem title="Tôi có cần tạo tài khoản để được nhận hoàn tiền không?">
               Bạn có thể sử dụng công cụ kiểm tra tiền hoàn miễn phí mà không cần đăng nhập. Tuy nhiên, để tạo link mua hàng, tích lũy số dư và rút tiền về tài khoản ngân hàng, bạn bắt buộc phải đăng nhập/đăng ký tài khoản để hệ thống có thể ghi nhận đúng mã định danh của bạn.

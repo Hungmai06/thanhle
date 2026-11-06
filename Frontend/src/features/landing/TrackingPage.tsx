@@ -449,10 +449,11 @@ export default function TrackingPage() {
                 filteredOrders.map((order) => {
                   const isTikTok = (order as any).platform === 'tiktok';
                   const isApproved = order.status === 'approved' || order.status === 'paid';
-                  const isPending = order.status === 'pending';
-                  const realVal = order.realCashback !== undefined && order.realCashback !== null 
-                    ? order.realCashback 
-                    : order.estimatedCashback;
+                  const isCancelled = order.status === 'rejected' || order.status === 'returned';
+                  const hasRealCashback = isApproved || (!isCancelled && order.realCashback !== undefined && order.realCashback !== null && Number(order.realCashback) > 0);
+                  const realVal = (order.realCashback !== undefined && order.realCashback !== null && Number(order.realCashback) > 0)
+                    ? Number(order.realCashback)
+                    : Number(order.estimatedCashback || 0);
 
                   return (
                     <tr key={order.id} className="border-b border-border hover:bg-primary/5 transition-colors">
@@ -489,20 +490,16 @@ export default function TrackingPage() {
                         {Math.floor(order.estimatedCashback).toLocaleString('vi-VN')}đ
                       </td>
                       <td className="py-4 px-3 text-right font-bold whitespace-nowrap">
-                        {isApproved ? (
+                        {hasRealCashback ? (
                           <span className="text-emerald-600 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md text-xs">
                             +{Math.floor(realVal).toLocaleString('vi-VN')}đ
                           </span>
-                        ) : order.status === 'received' ? (
-                          <span className="text-sky-600 text-[11px] font-semibold bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
-                            Đã tiếp nhận
-                          </span>
-                        ) : isPending ? (
+                        ) : isCancelled ? (
+                          <span className="text-slate-400 text-xs">0đ</span>
+                        ) : (
                           <span className="text-amber-600 text-[11px] font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
                             Chờ đối soát
                           </span>
-                        ) : (
-                          <span className="text-slate-400 text-xs">0đ</span>
                         )}
                       </td>
                       <td className="py-4 px-3 text-center whitespace-nowrap">{getStatusBadge(order.status, order.id)}</td>

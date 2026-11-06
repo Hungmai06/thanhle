@@ -204,6 +204,7 @@ export default function TikTokPage() {
         productUrl: checkedProduct.originUrl || tiktokLink,
         shopId: checkedProduct.shopName || 'TikTok Shop',
         itemId: checkedProduct.productId || '',
+        subId: checkedProduct.subId,
         platform: 'tiktok'
       };
       addOrder(newOrder);

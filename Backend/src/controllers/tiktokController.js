@@ -248,17 +248,7 @@ async function convertTikTokLink(req, res) {
       affiliateLink = `${fallbackCookieUrl}${separator}url=${encodeURIComponent(rawUrl || '')}&sub_id=${encodeURIComponent(subId)}`;
     }
 
-    // C. Lưu click log vào database để đối soát đơn hàng sau này
-    try {
-      await db.run(
-        'INSERT INTO click_logs (id, user_id, product_url, sub_id, item_id) VALUES (?, ?, ?, ?, ?)',
-        [clickId, resolvedUserId || null, rawUrl || '', subId, productId || null]
-      );
-    } catch (logErr) {
-      console.warn('Lỗi ghi click log TikTok:', logErr.message);
-    }
-
-    // D. Nếu chưa có thông tin sản phẩm từ product-links nhưng có productId, thử tra cứu bổ sung qua getProductInfo
+    // C. Nếu chưa có thông tin sản phẩm từ product-links nhưng có productId, thử tra cứu bổ sung qua getProductInfo
     if (!productInfo && productId && hasRiohubKey) {
       try {
         const prodData = await getProductInfo([productId], creatorUsername);
@@ -286,41 +276,8 @@ async function convertTikTokLink(req, res) {
       };
     }
 
-    // D2. Nếu người dùng đã đăng nhập, tự động lưu đơn chờ vào tiktok_orders để hiển thị ngay trong danh sách tra cứu
-    if (resolvedUserId) {
-      try {
-        const existingTikTok = await db.get('SELECT id FROM tiktok_orders WHERE id = ?', [clickId]);
-        if (!existingTikTok) {
-          const estCash = Math.floor(productInfo.estimatedCashback || 0);
-          const pPrice = Math.floor(productInfo.price || 0);
-          const pName = productInfo.name || 'Sản phẩm TikTok Shop';
-          const pImg = productInfo.image || '';
-          const comm = Math.floor(productInfo.estimatedCommission || (estCash * 2));
-
-          await db.run(
-            `INSERT INTO tiktok_orders (
-              id, user_id, click_id, product_name, product_image,
-              order_amount, estimated_cashback, real_cashback, tiktok_commission,
-              status, sub_id, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 'pending', ?, ?)`,
-            [
-              clickId,
-              resolvedUserId,
-              clickId,
-              pName,
-              pImg,
-              pPrice,
-              estCash,
-              comm,
-              subId,
-              'Đơn hàng TikTok Shop (Chờ sàn đối soát)'
-            ]
-          );
-        }
-      } catch (saveErr) {
-        console.warn('Lỗi lưu đơn pending TikTok:', saveErr.message);
-      }
-    }
+    // Lưu ý: Không lưu đơn hay click log tại bước tìm kiếm/tra cứu này.
+    // Đơn hàng và click log chỉ được lưu lại khi người dùng thực sự bấm vào nút "Mua ngay / Chuyển tới sàn" (thông qua /api/orders/click-log) để tránh trùng lặp 2 lần.
 
     return res.json({
       success: true,

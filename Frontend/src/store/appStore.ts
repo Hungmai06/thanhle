@@ -568,12 +568,15 @@ export const useAppStore = create<AppState>((set, get) => ({
           userId: order.userId,
           shopId: order.shopId || '',
           itemId: order.itemId || '',
+          subId: (order as any).subId || (order as any).sub_id || '',
           platform
         })
       });
-      // Visual feedback in local UI & sync state
+      // Visual feedback in local UI & sync state (tránh trùng lặp id)
       const orderWithPlatform = { ...order, platform };
-      set((state) => ({ orders: [orderWithPlatform as any, ...state.orders] }));
+      set((state) => ({
+        orders: [orderWithPlatform as any, ...state.orders.filter(o => o.id !== order.id)]
+      }));
       get().fetchUserOrders().catch(() => {});
     } catch (error) {
       console.error('Click log error:', error);
