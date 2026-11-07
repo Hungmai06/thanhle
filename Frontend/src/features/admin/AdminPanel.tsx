@@ -34,6 +34,9 @@ const renderOrderStatusBadge = (status: string, orderId?: string) => {
   if (status === 'rejected') {
     return <Badge className="bg-rose-500 hover:bg-rose-600 text-white border-none text-[11px] font-bold">Đơn hủy</Badge>;
   }
+  if (status === 'unpurchased') {
+    return <Badge className="bg-slate-500 hover:bg-slate-600 text-white border-none text-[11px] font-bold">Chưa mua hàng</Badge>;
+  }
   return <Badge className="bg-amber-500 hover:bg-amber-600 text-white border-none text-[11px] font-bold">Chờ đối soát</Badge>;
 };
 import {
@@ -686,7 +689,7 @@ export default function AdminPanel() {
   // Action handlers
   const handleApproveOrder = (orderId: string, realCash?: number) => {
     updateOrderStatus(orderId, 'approved', realCash);
-    toast.success(`Đã duyệt đơn hàng ${orderId}`);
+    toast.success(`Đã kích hoạt hoàn thành đơn hàng ${orderId}! Tiền hoàn và hoa hồng giới thiệu đã được cộng vào ví.`);
     setSelectedOrderDetail(null);
   };
 
@@ -2345,6 +2348,16 @@ export default function AdminPanel() {
                               </TableCell>
                               <TableCell className="text-center">
                                 <div className="flex items-center justify-center gap-1.5">
+                                  {(o.status === 'pending' || o.status === 'unpurchased') && (
+                                    <button
+                                      onClick={() => handleApproveOrder(o.id, Math.floor(o.realCashback !== undefined ? o.realCashback : o.estimatedCashback))}
+                                      className="px-2.5 py-1.5 text-xs font-bold border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-button transition-all flex items-center justify-center gap-1 shadow-xs"
+                                      title="Kích hoạt hoàn thành đơn hàng bằng tay (kích hoạt mở khóa +5K & +20% hoa hồng)"
+                                    >
+                                      <Check className="h-3.5 w-3.5" />
+                                      Duyệt
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => {
                                       setEditingOrder(o);
@@ -2636,13 +2649,16 @@ export default function AdminPanel() {
                               </TableCell>
                               <TableCell className="text-center">
                                 <div className="flex items-center justify-center gap-1">
-                                  {order.status === 'pending' && (
+                                  {(order.status === 'pending' || order.status === 'unpurchased') && (
                                     <>
                                       <Button
                                         size="sm"
-                                        onClick={() => updateTikTokOrderStatus(order.id, 'approved', Math.floor(order.estimatedCashback), order.notes, order.userId)}
+                                        onClick={async () => {
+                                          await updateTikTokOrderStatus(order.id, 'approved', Math.floor(order.estimatedCashback), order.notes, order.userId);
+                                          toast.success(`Đã kích hoạt hoàn thành đơn TikTok ${order.id}! Tiền hoàn và hoa hồng giới thiệu đã được cộng vào ví.`);
+                                        }}
                                         className="h-7 w-7 p-0 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-md"
-                                        title="Duyệt hoàn thành"
+                                        title="Kích hoạt hoàn thành đơn hàng bằng tay (kích hoạt mở khóa +5K & +20% hoa hồng)"
                                       >
                                         <Check className="h-3.5 w-3.5" />
                                       </Button>

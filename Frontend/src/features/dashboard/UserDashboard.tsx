@@ -247,6 +247,9 @@ export default function UserDashboard() {
     if (status === 'rejected') {
       return <Badge className="bg-rose-500 hover:bg-rose-600 text-white border-none text-[11px] font-bold">Đơn hủy</Badge>;
     }
+    if (status === 'unpurchased') {
+      return <Badge className="bg-slate-500 hover:bg-slate-600 text-white border-none text-[11px] font-bold">Chưa mua hàng</Badge>;
+    }
     return <Badge className="bg-amber-500 hover:bg-amber-600 text-white border-none text-[11px] font-bold">Chờ đối soát</Badge>;
   };
 
@@ -580,7 +583,7 @@ export default function UserDashboard() {
                                   <span className="text-emerald-600 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md text-xs">
                                     +{Math.floor(Number(order.realCashback || order.estimatedCashback || 0)).toLocaleString('vi-VN')}đ
                                   </span>
-                                ) : (order.status === 'rejected' || order.status === 'returned') ? (
+                                ) : (order.status === 'rejected' || order.status === 'returned' || order.status === 'unpurchased') ? (
                                   <span className="text-slate-400 text-xs">0đ</span>
                                 ) : (
                                   <span className="text-amber-600 text-[11px] font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">

@@ -138,11 +138,16 @@ if (isClusterEnabled && cluster.isPrimary) {
 
         // Tự động đồng bộ và đối soát đơn hàng TikTok Shop qua API định kỳ mỗi 15 phút
         const { runAutoSyncTikTokJob } = require('./src/controllers/tiktokController');
+        const { autoCleanAndCheckUnpurchasedOrders } = require('./src/services/orderCleanupService');
+
         setTimeout(() => {
           runAutoSyncTikTokJob().catch(() => {});
+          autoCleanAndCheckUnpurchasedOrders().catch(() => {});
         }, 30 * 1000);
+
         setInterval(() => {
           runAutoSyncTikTokJob().catch(() => {});
+          autoCleanAndCheckUnpurchasedOrders().catch(() => {});
         }, 15 * 60 * 1000);
       });
     } catch (error) {

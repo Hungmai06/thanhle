@@ -197,6 +197,13 @@ export default function TrackingPage() {
         </span>
       );
     }
+    if (status === 'unpurchased') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-300 shadow-xs">
+          Chưa mua hàng
+        </span>
+      );
+    }
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-50 text-amber-600 border border-amber-200 shadow-xs">
         Chờ đối soát
@@ -426,6 +433,7 @@ export default function TrackingPage() {
               <option value="approved">Đã duyệt</option>
               <option value="rejected">Đơn hủy</option>
               <option value="returned">Đơn hoàn</option>
+              <option value="unpurchased">Chưa mua hàng</option>
             </select>
           </div>
         </div>
@@ -449,7 +457,7 @@ export default function TrackingPage() {
                 filteredOrders.map((order) => {
                   const isTikTok = (order as any).platform === 'tiktok';
                   const isApproved = order.status === 'approved' || order.status === 'paid';
-                  const isCancelled = order.status === 'rejected' || order.status === 'returned';
+                  const isCancelled = order.status === 'rejected' || order.status === 'returned' || order.status === 'unpurchased';
                   const hasRealCashback = isApproved || (!isCancelled && order.realCashback !== undefined && order.realCashback !== null && Number(order.realCashback) > 0);
                   const realVal = (order.realCashback !== undefined && order.realCashback !== null && Number(order.realCashback) > 0)
                     ? Number(order.realCashback)

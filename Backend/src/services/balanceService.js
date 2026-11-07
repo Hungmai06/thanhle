@@ -127,8 +127,88 @@ async function recalculateUserBalances(dbInstance = null, targetUserIds = null) 
   return { updatedCount: users.length };
 }
 
+/**
+ * Xử lý toàn bộ logic thưởng giới thiệu khi một đơn hàng được duyệt hoàn thành:
+ * 1. Thưởng mời bạn +5.000đ nếu đây là đơn hoàn thành đầu tiên của cấp dưới F1.
+ * 2. Hoa hồng +20% tiền hoàn đơn hàng cho người giới thiệu.
+ * 3. Gửi thông báo chi tiết đến người giới thiệu.
+ * 4. Tự động đồng bộ chuẩn xác số dư ví của cả người mua và người giới thiệu qua recalculateUserBalances.
+ */
+async function processReferralRewardsOnOrderComplete(dbInstance, orderId, targetUserId, cashbackAmount, platform = 'Shopee') {
+  if (!targetUserId) return;
+  const db = dbInstance || (await getDatabase());
+  const finalCashback = Math.max(0, Math.floor(Number(cashbackAmount) || 0));
+
+  try {
+    const userObj = await db.get('SELECT id, name, email, referred_by FROM users WHERE id = ?', [targetUserId]);
+    if (!userObj || !userObj.referred_by) {
+      // User không có người giới thiệu, chỉ recalculate cho chính user
+      await recalculateUserBalances(db, [targetUserId]);
+      return;
+    }
+
+    const referrerId = userObj.referred_by;
+    const referrer = await db.get('SELECT id, name FROM users WHERE id = ?', [referrerId]);
+    if (!referrer) {
+      await recalculateUserBalances(db, [targetUserId]);
+      return;
+    }
+
+    // 1. Đếm tổng số đơn hoàn thành của F1 này (cả Shopee và TikTok)
+    const completedCountRow = await db.get(
+      `SELECT (
+         (SELECT COUNT(*) FROM orders WHERE user_id = ? AND status IN ('approved', 'paid')) +
+         (SELECT COUNT(*) FROM tiktok_orders WHERE user_id = ? AND status IN ('approved', 'paid'))
+       ) as totalCompleted`,
+      [targetUserId, targetUserId]
+    );
+    const totalCompleted = Number(completedCountRow?.totalCompleted || 0);
+
+    const f1DisplayName = userObj.name || userObj.email || userObj.id;
+
+    // 2. Nếu đây là đơn hàng hoàn thành đầu tiên của F1 (totalCompleted === 1):
+    // Mở khóa +5.000đ thưởng mời bạn!
+    if (totalCompleted === 1) {
+      const inviteNotifId = `NT_INV_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      await db.run(
+        `INSERT INTO notifications (id, user_id, title, content, type)
+         VALUES (?, ?, '🎉 Mở khóa +5.000đ thưởng giới thiệu bạn bè!', ?, 'wallet')`,
+        [
+          inviteNotifId,
+          referrerId,
+          `Chúc mừng bạn! Cấp dưới "${f1DisplayName}" đã hoàn thành đơn hàng đầu tiên. Khoản thưởng mời bạn +5.000đ từ mục Chờ duyệt đã được mở khóa và cộng thẳng vào Số dư khả dụng của bạn!`
+        ]
+      ).catch(() => {});
+    }
+
+    // 3. Tính hoa hồng 20% trên tiền hoàn đơn của F1
+    if (finalCashback > 0) {
+      const orderCommission = Math.floor(finalCashback * 0.20);
+      if (orderCommission > 0) {
+        const commNotifId = `NT_COMM_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        await db.run(
+          `INSERT INTO notifications (id, user_id, title, content, type)
+           VALUES (?, ?, '💰 Nhận +20% hoa hồng giới thiệu!', ?, 'wallet')`,
+          [
+            commNotifId,
+            referrerId,
+            `Bạn nhận được +${orderCommission.toLocaleString('vi-VN')}đ hoa hồng (20% tiền hoàn) từ đơn hàng ${platform} #${orderId} của cấp dưới "${f1DisplayName}".`
+          ]
+        ).catch(() => {});
+      }
+    }
+
+    // 4. Đồng bộ chuẩn xác tuyệt đối số dư cho cả người mua và người giới thiệu
+    await recalculateUserBalances(db, [targetUserId, referrerId]);
+  } catch (err) {
+    console.error('Error processing referral rewards on order complete:', err);
+    await recalculateUserBalances(db, [targetUserId]);
+  }
+}
+
 module.exports = {
   recalculateUserBalances,
+  processReferralRewardsOnOrderComplete,
   SIGNUP_BONUS_AMOUNT,
   REFERRAL_BONUS_PER_USER
 };

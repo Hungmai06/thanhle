@@ -11,7 +11,7 @@ export interface Order {
   shopeeCommission?: number;
   tiktokCommission?: number;
   platform?: 'shopee' | 'tiktok';
-  status: 'pending' | 'received' | 'approved' | 'rejected' | 'returned' | 'paid';
+  status: 'pending' | 'received' | 'approved' | 'rejected' | 'returned' | 'paid' | 'unpurchased';
   createdTime: string;
   userId: string;
   productUrl?: string;

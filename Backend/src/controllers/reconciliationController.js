@@ -5,6 +5,7 @@ const XLSX = require('xlsx');
 const { getDatabase } = require('../config/db');
 const { recalculateUserBalances } = require('../services/balanceService');
 const { extractShopeeIds } = require('../services/shopeeService');
+const { autoCleanAndCheckUnpurchasedOrders } = require('../services/orderCleanupService');
 
 async function readRowsFromFile(filePath, originalName = '') {
   const ext = path.extname(originalName || filePath).toLowerCase();
@@ -2053,6 +2054,22 @@ async function applyReconciliation(req, res) {
       }
     }
 
+    // Chuyển các đơn pending Shopee không tìm thấy trong kỳ đối soát CSV sang 'unpurchased' (Chưa mua hàng)
+    let unpurchasedCount = 0;
+    for (const p of pendingOrders) {
+      if (p && p.id && !consumedPendingOrderIds.has(p.id.toLowerCase())) {
+        await db.run(
+          `UPDATE orders 
+           SET status = 'unpurchased',
+               notes = 'Chưa mua hàng (Không tìm thấy trong kỳ đối soát Shopee)',
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND status = 'pending'`,
+          [p.id]
+        );
+        unpurchasedCount++;
+      }
+    }
+
     // Insert reconciliation log
     const logId = `REC${Date.now()}`;
     await db.run(
@@ -2071,6 +2088,9 @@ async function applyReconciliation(req, res) {
 
     // Tự động đồng bộ và tính lại toàn bộ số dư người dùng theo tất cả đơn hoàn thành và lịch sử rút tiền
     await recalculateUserBalances(db);
+
+    // Tự động quét dọn các đơn hàng chưa mua quá 7 ngày
+    await autoCleanAndCheckUnpurchasedOrders(db);
 
     // Commit Transaction
     await db.run('COMMIT');

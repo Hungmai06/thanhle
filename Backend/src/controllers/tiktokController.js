@@ -16,7 +16,7 @@ const {
   verifyWebhookSignature
 } = require('../services/riohubService');
 const { getDatabase } = require('../config/db');
-const { recalculateUserBalances } = require('../services/balanceService');
+const { recalculateUserBalances, processReferralRewardsOnOrderComplete } = require('../services/balanceService');
 
 /**
  * Sinh mã tracking clickId độc nhất cho hệ thống
@@ -1187,22 +1187,14 @@ async function adminUpdateTikTokOrderStatus(req, res) {
       ).catch(() => {});
 
       if ((status === 'approved' || status === 'paid') && order.status !== 'approved' && order.status !== 'paid') {
-        const userObj = await db.get('SELECT referred_by FROM users WHERE id = ?', [targetUserId]);
-        if (userObj && userObj.referred_by) {
-          const refBonus = Math.floor(finalRealCash * 0.20);
-          if (refBonus > 0) {
-            const refNotifId = `NT${Date.now()}${Math.floor(Math.random() * 100)}`;
-            await db.run(
-              `INSERT INTO notifications (id, user_id, title, content, type)
-               VALUES (?, ?, 'Hoa hồng giới thiệu', ?, 'system')`,
-              [refNotifId, userObj.referred_by, `Bạn nhận được +${refBonus.toLocaleString('vi-VN')}đ hoa hồng từ đơn TikTok hoàn thành của người bạn giới thiệu.`]
-            ).catch(() => {});
-          }
-        }
+        // Xử lý toàn bộ logic thưởng giới thiệu: mở khóa +5.000đ cho đơn đầu và +20% hoa hồng cho người giới thiệu
+        await processReferralRewardsOnOrderComplete(db, id, targetUserId, finalRealCash, 'TikTok Shop');
+      } else {
+        await recalculateUserBalances(db, [targetUserId, order.user_id].filter(Boolean));
       }
+    } else {
+      await recalculateUserBalances(db, [targetUserId, order.user_id].filter(Boolean));
     }
-
-    await recalculateUserBalances(db, [targetUserId, order.user_id].filter(Boolean));
     res.json({ message: 'Đã cập nhật trạng thái đơn TikTok thành công' });
   } catch (error) {
     console.error('adminUpdateTikTokOrderStatus Error:', error);

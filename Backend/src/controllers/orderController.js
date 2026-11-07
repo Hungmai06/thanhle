@@ -1,6 +1,7 @@
 const { getDatabase } = require('../config/db');
-const { recalculateUserBalances } = require('../services/balanceService');
+const { recalculateUserBalances, processReferralRewardsOnOrderComplete } = require('../services/balanceService');
 const { extractShopeeIds } = require('../services/shopeeService');
+const { autoCleanAndCheckUnpurchasedOrders } = require('../services/orderCleanupService');
 
 async function logClick(req, res) {
   const { id, clickId: customClickId, productUrl, productName, productImage, orderAmount, estimatedCashback, userId: bodyUserId, shopId: bodyShopId, itemId: bodyItemId } = req.body;
@@ -97,6 +98,9 @@ async function getUserOrders(req, res) {
   try {
     const db = await getDatabase();
     
+    // Tự động kiểm tra đơn TikTok pending > 24h -> unpurchased, và xóa đơn chưa mua > 7 ngày
+    await autoCleanAndCheckUnpurchasedOrders(db);
+    
     // 1. Shopee Orders query
     let shopeeQuery = `
       SELECT id, user_id, click_id, product_name, product_image, order_amount,
@@ -165,6 +169,10 @@ async function adminGetOrders(req, res) {
 
   try {
     const db = await getDatabase();
+    
+    // Tự động kiểm tra đơn TikTok pending > 24h -> unpurchased, và xóa đơn chưa mua > 7 ngày
+    await autoCleanAndCheckUnpurchasedOrders(db);
+
     const offset = (page - 1) * limit;
 
     let query = `
@@ -315,51 +323,11 @@ async function adminUpdateOrderStatus(req, res) {
     // 2. If order is approved (now or previously), and assigned/reassigned to targetUserId
     if (isNowApproved && targetUserId) {
       if (!wasApproved || !oldUserId || oldUserId !== targetUserId) {
-        // Credit new targetUserId
-        const userCashback = Math.floor(updatedRealCashback);
-        await db.run(
-          `UPDATE users 
-           SET balance = COALESCE(balance, 0) + ?,
-               total_cashback = COALESCE(total_cashback, 0) + ?
-           WHERE id = ?`,
-          [userCashback, userCashback, targetUserId]
-        );
-
-        // Check for referral bonus (+5,000đ when F1 completes their first order)
-        const currentUserObj = await db.get('SELECT name, referred_by FROM users WHERE id = ?', [targetUserId]);
-        if (currentUserObj && currentUserObj.referred_by) {
-          const completedCountRow = await db.get(
-            `SELECT (
-               (SELECT COUNT(*) FROM orders WHERE user_id = ? AND status IN ('approved', 'paid')) +
-               (SELECT COUNT(*) FROM tiktok_orders WHERE user_id = ? AND status IN ('approved', 'paid'))
-             ) as totalCompleted`,
-            [targetUserId, targetUserId]
-          );
-          if (Number(completedCountRow?.totalCompleted || 0) === 1) {
-            const refNotifId = `NT${Date.now()}${Math.floor(Math.random() * 100)}`;
-            await db.run(
-              `INSERT INTO notifications (id, user_id, title, content, type)
-               VALUES (?, ?, '🎉 Mở khóa +5.000đ thưởng giới thiệu!', ?, 'wallet')`,
-              [
-                refNotifId,
-                currentUserObj.referred_by,
-                `Cấp dưới "${currentUserObj.name || targetUserId}" đã hoàn thành đơn hàng đầu tiên! +5.000đ từ mục Chờ duyệt đã được chuyển sang Đã duyệt và cộng vào Số dư khả dụng của bạn.`
-              ]
-            );
-          }
-        }
+        // Xử lý toàn bộ logic thưởng giới thiệu: mở khóa +5.000đ cho đơn đầu và +20% hoa hồng cho người giới thiệu
+        await processReferralRewardsOnOrderComplete(db, id, targetUserId, updatedRealCashback, 'Shopee');
       } else if (wasApproved && oldUserId === targetUserId) {
-        // Same user, check if cashback amount changed
-        const diff = Math.floor(updatedRealCashback) - Math.floor(oldCashback);
-        if (diff !== 0) {
-          await db.run(
-            `UPDATE users 
-             SET balance = CASE WHEN (COALESCE(balance, 0) + ?) >= 0 THEN (COALESCE(balance, 0) + ?) ELSE 0 END,
-                 total_cashback = CASE WHEN (COALESCE(total_cashback, 0) + ?) >= 0 THEN (COALESCE(total_cashback, 0) + ?) ELSE 0 END
-             WHERE id = ?`,
-            [diff, diff, diff, diff, targetUserId]
-          );
-        }
+        // Cùng user nhưng cập nhật lại số tiền hoàn
+        await recalculateUserBalances(db, [targetUserId]);
       }
     }
 
